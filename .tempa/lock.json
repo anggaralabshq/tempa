@@ -1,17 +1,17 @@
 {
   "files": {
-    ".claude/commands/review.md": "73f118f969275c2c785577730f7487eb5248eaace1c72367ef60001f9e2b1e23",
+    ".claude/commands/review.md": "d0188a559766aa1b9860013d7ca0602fc581af40a2196f53972db224e47eefa1",
     ".claude/settings.json": "b8c54434a09aad9187e46d58b3bc300dcab29ac475988cc5e63599b48e014e4f",
     ".codex/config.toml": "50af9f140eec9305b3a73435309e4084b76a034dd4ce8416bdaf59076ec09c93",
     ".cursor/cli.json": "741f7777bdb09f0881b3b587ce522d3e8dd9abd2aa7852ecd4851830426f90c3",
-    ".cursor/commands/review.md": "294adcb1c8b83825bf49f10277f78d9c5e43447800987641f1091bace44eb218",
+    ".cursor/commands/review.md": "a6d3c1e354c6290184b31791fabfc39d5ebc7b1708cdc4f1d5f4bb17d69a4354",
     ".cursor/mcp.json": "4809693514b746fa5b077c46b90a05e2ec07030f9fa6539fcc403c27cb963d3d",
-    ".gemini/commands/review.toml": "2a2eee4acbe4535520168a2135c190fc36a3a836cbfe4a714dc7dba71f2e08f0",
+    ".gemini/commands/review.toml": "424f5e7887cb490c161ab3a3d8b8a0087c1706f75f166981fa46c6f652048c84",
     ".gemini/settings.json": "4e3ac96597057b21cfc27460b7fd9f5e4b390c5deb0ea3f56d6bc360c3fba711",
     ".github/mcp.json": "746d9e127f61ced9a02c66a90804294dff82c4388b48326522aeb478d1f4c792",
-    ".github/skills/review/SKILL.md": "4bd60eed359fd98da1a4fc8cbbb990cc784101354e40972466edc8cb3b2d7bc4",
+    ".github/skills/review/SKILL.md": "b660a3778fe6e923730086023a5a6f702c4ee2d57e1fb3c988b7b377ded7b67a",
     ".mcp.json": "4809693514b746fa5b077c46b90a05e2ec07030f9fa6539fcc403c27cb963d3d",
-    ".opencode/commands/review.md": "73f118f969275c2c785577730f7487eb5248eaace1c72367ef60001f9e2b1e23",
+    ".opencode/commands/review.md": "d0188a559766aa1b9860013d7ca0602fc581af40a2196f53972db224e47eefa1",
     "CLAUDE.md": "246825d497f0fde93d9e9398f1668d6ff8afba6e6bb3c5b8c755eb7f0adee68e",
     "opencode.json": "9ccaff6b626a42c163dd13837656f4c33e41a3b24c3e8461a29d201fc50a4df0"
   }

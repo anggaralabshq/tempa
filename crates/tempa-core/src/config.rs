@@ -127,10 +127,10 @@ impl Default for Gates {
             plan_before_edit: true,
             review_required: false,
             decision_required_for: strings(&["new-dependency", "schema-change", "public-api"]),
-            schema_paths: strings(&["migrations/**"]),
-            public_api_paths: strings(&["src/api/**"]),
+            schema_paths: vec![],
+            public_api_paths: vec![],
             max_diff_lines: 800,
-            protected_paths: strings(&[".env*", "bitbucket-pipelines.yml", "tempa.toml"]),
+            protected_paths: strings(&[".env*", "tempa.toml"]),
         }
     }
 }
@@ -185,8 +185,12 @@ struct Raw {
 impl Config {
     pub fn load(root: &Path) -> Result<Config> {
         let path = root.join(FILE);
-        let text = std::fs::read_to_string(&path)
-            .map_err(|_| Error(format!("{FILE} tidak ditemukan; jalankan `tempa init`")))?;
+        let text = std::fs::read_to_string(&path).map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => {
+                Error(format!("{FILE} tidak ditemukan; jalankan `tempa init`"))
+            }
+            _ => Error(format!("{FILE} tidak bisa dibaca: {e}")),
+        })?;
         Self::parse(&text)
     }
 
@@ -216,10 +220,11 @@ impl Config {
 
 /// Default `tempa.toml` text (spec 9.1).
 pub fn default_toml(project_name: &str) -> String {
+    let project_name = toml::Value::String(project_name.to_string()).to_string();
     format!(
         r#"# Konfigurasi Tempa. Satu-satunya sumber aturan proyek.
 [project]
-name = "{project_name}"
+name = {project_name}
 tempa_version = "{version}"
 
 [docs]            # peran → nama file, bebas diganti
@@ -242,10 +247,10 @@ enabled = ["claude", "codex", "gemini", "opencode", "cursor"]
 plan_before_edit      = true
 review_required       = false
 decision_required_for = ["new-dependency", "schema-change", "public-api"]
-schema_paths          = ["migrations/**"]
-public_api_paths      = ["src/api/**"]
+schema_paths          = []   # mis. ["migrations/**"]
+public_api_paths      = []   # mis. ["src/api/**"]
 max_diff_lines        = 800
-protected_paths       = [".env*", "bitbucket-pipelines.yml", "tempa.toml"]
+protected_paths       = [".env*", "tempa.toml"]   # tambahkan file CI, mis. "bitbucket-pipelines.yml" atau ".github/workflows/**"
 
 [ci]
 base            = "main"

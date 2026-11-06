@@ -81,4 +81,19 @@ echo "== langkah 7: doctor"
 expect_code 0 tempa doctor
 echo "$OUT" | grep -q "^codex" || fail "doctor tanpa baris codex:\n$OUT"
 
+echo "== langkah 8: dua clone, lock ikut commit, editan tidak hilang"
+git checkout -q main && git merge -q --no-edit "$(git rev-parse --abbrev-ref @{-1})"
+git init -q --bare "$WORK/origin.git" && git push -q --no-verify "$WORK/origin.git" main
+git clone -q "$WORK/origin.git" "$WORK/B" && (cd "$WORK/B" && git config core.hooksPath .tempa/hooks)
+printf -- '---\ndescription: R\n---\nreview versi A\n' > ".tempa/commands/review.md"
+git add -A && git commit -qm "A ubah review"
+[ -z "$(git status --porcelain)" ] || fail "lock/target tidak ikut commit:\n$(git status --porcelain)"
+git push -q --no-verify "$WORK/origin.git" main
+cd "$WORK/B" && git pull -q origin main
+printf -- '---\ndescription: R\n---\nreview versi A\n\nLangkah B.\n' > ".tempa/commands/review.md"
+git add -A
+expect_code 0 git commit -qm "B ubah review"
+grep -q "Langkah B." .claude/commands/review.md || fail "editan B hilang dari target"
+expect_code 0 tempa sync --check
+
 echo "e2e OK"

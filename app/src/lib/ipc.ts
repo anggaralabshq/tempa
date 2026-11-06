@@ -18,3 +18,21 @@ export type Project = { id: string; name: string; path: string };
 export const projectsList = () => invoke<Project[]>("projects_list");
 export const projectsAdd = (path: string) => invoke<Project>("projects_add", { path });
 export const projectsRemove = (id: string) => invoke("projects_remove", { id });
+
+export type FindingDto = { code: string; severity: "error" | "warning"; path: string | null; message: string };
+export type ContractStatus = {
+  has_config: boolean;
+  offer: "init" | "import" | null;
+  findings: FindingDto[];
+  drift: FindingDto[];
+  agents: { agent: string; files: number; gaps: number; lifecycle: string }[];
+  hooks_ok: boolean;
+  cli_version: string | null;
+  app_version: string;
+  error: string | null;
+};
+export type ContractAction = "absorb" | "discard" | "init" | "import" | "hooks";
+export const contractStatus = (root: string) => invoke<ContractStatus>("contract_status", { root });
+export const contractPreview = (root: string, action: "absorb" | "discard") =>
+  invoke<string[]>("contract_preview", { root, action });
+export const contractRun = (root: string, action: ContractAction) => invoke<string[]>("contract_run", { root, action });

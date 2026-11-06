@@ -12,7 +12,7 @@ pub struct AgentRow {
     pub gaps: Vec<Gap>,
     /// "settings deny" | "gap (CI)"
     pub protected: &'static str,
-    /// "mcp" when the agent gets the `tempa mcp` server, else "M3" (host lifecycle).
+    /// "mcp" when the agent gets the `tempa mcp` server, else "off".
     pub lifecycle: &'static str,
 }
 
@@ -52,7 +52,7 @@ pub fn doctor(root: &Path) -> Result<DoctorReport> {
                 lifecycle: if cfg.mcp.serve || src.mcp.contains_key(TEMPA_SERVER) {
                     "mcp"
                 } else {
-                    "M3"
+                    "off"
                 },
             }
         })

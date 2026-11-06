@@ -75,7 +75,7 @@ pub fn check(root: &Path, opts: &CheckOpts) -> Result<Vec<Finding>> {
 
     f.extend(drift_findings(&drift(root)?));
 
-    let base_name = gitx::base_name(&cfg, opts.base.as_deref());
+    let base_name = gitx::base_name(root, &cfg, opts.base.as_deref());
     let base = gitx::resolve_base(root, &cfg, opts.base.as_deref());
     if base.is_none() {
         let msg = format!(

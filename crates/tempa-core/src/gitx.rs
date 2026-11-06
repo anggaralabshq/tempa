@@ -40,7 +40,9 @@ pub fn current_branch(root: &Path) -> Result<String> {
 }
 
 /// Base branch name: explicit → `BITBUCKET_PR_DESTINATION_BRANCH` → `ci.base`.
-pub fn base_name(cfg: &Config, explicit: Option<&str>) -> String {
+/// Base branch: `explicit`, the PR destination in CI, the branch a task branch was
+/// started from (recorded by `tempa task new`), else `[ci].base`.
+pub fn base_name(root: &Path, cfg: &Config, explicit: Option<&str>) -> String {
     explicit
         .map(String::from)
         .or_else(|| {
@@ -48,12 +50,30 @@ pub fn base_name(cfg: &Config, explicit: Option<&str>) -> String {
                 .ok()
                 .filter(|s| !s.is_empty())
         })
+        .or_else(|| task_base(root))
         .unwrap_or_else(|| cfg.ci.base.clone())
+}
+
+fn base_key(branch: &str) -> String {
+    format!("branch.{branch}.tempaBase")
+}
+
+/// Record `base` as the branch the current branch was started from (repo-local git config).
+pub fn set_task_base(root: &Path, base: &str) -> Result<()> {
+    git(root, &["config", &base_key(&current_branch(root)?), base]).map(|_| ())
+}
+
+fn task_base(root: &Path) -> Option<String> {
+    let key = base_key(&current_branch(root).ok()?);
+    git(root, &["config", "--get", &key])
+        .ok()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
 }
 
 /// Merge-base commit of HEAD and the base branch (`origin/<name>` first), if reachable.
 pub fn resolve_base(root: &Path, cfg: &Config, explicit: Option<&str>) -> Option<String> {
-    let name = base_name(cfg, explicit);
+    let name = base_name(root, cfg, explicit);
     [format!("origin/{name}"), name].iter().find_map(|r| {
         git(
             root,

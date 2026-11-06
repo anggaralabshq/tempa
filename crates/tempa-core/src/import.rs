@@ -25,6 +25,8 @@ pub struct ImportReport {
     pub synced: Vec<String>,
     /// Targets left alone because their edits could not be absorbed (apply only).
     pub conflicts: Vec<String>,
+    /// Targets whose edits are taken into the source; the closing sync may overwrite them.
+    pub absorbed: Vec<String>,
 }
 
 /// Everything import would change, computed before touching disk.
@@ -648,6 +650,7 @@ pub fn import(root: &Path, apply: bool) -> Result<ImportReport> {
         report.written.push(config::FILE.to_string());
     }
     report.written.sort();
+    report.absorbed = plan.absorbed.iter().cloned().collect();
 
     if apply {
         if plan.create_config {

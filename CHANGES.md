@@ -103,3 +103,10 @@
 - Decision: docs/decisions/2026-11-06-core-command-and-absorbed.md
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-m3-host-mcp-verify
+- Ringkasan: Host MCP mode in the app binary; Verify recorded by the host moves the task state
+- Alasan: M3: harness results must come from the host, not the agent
+- Decision: docs/decisions/2026-11-06-host-mcp-in-app-binary.md
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

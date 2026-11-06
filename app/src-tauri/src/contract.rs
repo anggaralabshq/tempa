@@ -6,10 +6,10 @@ use tempa_core::check::{CheckOpts, check};
 use tempa_core::sync::{self, Drift};
 use tempa_core::{Finding, Severity, doctor, import, init};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Serialize, serde::Deserialize)]
 pub struct FindingDto {
     pub code: String,
-    pub severity: &'static str,
+    pub severity: String,
     pub path: Option<String>,
     pub message: String,
 }
@@ -39,13 +39,14 @@ pub struct ContractStatus {
     pub error: Option<String>,
 }
 
-fn dto(f: &Finding) -> FindingDto {
+pub(crate) fn dto(f: &Finding) -> FindingDto {
     FindingDto {
         code: f.code.to_string(),
         severity: match f.severity {
             Severity::Error => "error",
             Severity::Warning => "warning",
-        },
+        }
+        .into(),
         path: f.path.clone(),
         message: f.message.clone(),
     }

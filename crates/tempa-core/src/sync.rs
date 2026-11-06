@@ -134,8 +134,9 @@ pub const ITEM_DIRS: [(&str, &str); 9] = [
 ];
 
 /// Shared config targets whose non-tempa keys `tempa import` keeps as a base.
-pub const CONFIG_FILES: [&str; 7] = [
+pub const CONFIG_FILES: [&str; 8] = [
     ".claude/settings.json",
+    ".github/mcp.json",
     ".mcp.json",
     ".cursor/mcp.json",
     ".cursor/cli.json",

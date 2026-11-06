@@ -180,3 +180,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-copilot-target
+- Ringkasan: GitHub Copilot is the sixth target: AGENTS.md native, commands as user-invoked skills in .github/skills, .github/agents, .github/mcp.json
+- Alasan: a teammate uses Copilot; m4 priority 1
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

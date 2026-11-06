@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "deny": [
+      "Edit(/.env*)",
+      "Edit(/.github/workflows/**)",
+      "Edit(/tempa.toml)"
+    ]
+  }
+}

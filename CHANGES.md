@@ -145,3 +145,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-freeze-m3-core
+- Ringkasan: Freeze M3 (3/3): fake ACP agent and core task::set_state removed; app and core back to M2
+- Alasan: owner refocused tempa on contract sync; M3 lives on branch m3
+- Decision: docs/decisions/2026-11-06-refocus-on-contract-sync.md
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

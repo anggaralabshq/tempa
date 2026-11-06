@@ -259,3 +259,28 @@ fn version_mismatch() {
     std::fs::write(d.path().join("tempa.toml"), toml).unwrap();
     assert!(codes(&check(d.path(), &contract()).unwrap()).contains(&"version.mismatch"));
 }
+
+#[test]
+fn diff_gate_ignores_lockfiles() {
+    let d = repo_on("tempa/20261106-locks");
+    let toml = read(d.path(), "tempa.toml")
+        .replace("max_diff_lines        = 800", "max_diff_lines        = 60");
+    std::fs::write(d.path().join("tempa.toml"), toml).unwrap();
+    git(d.path(), &["commit", "-qam", "limit"]);
+    git(d.path(), &["switch", "-q", "main"]);
+    git(d.path(), &["merge", "-q", "tempa/20261106-locks"]);
+    git(d.path(), &["switch", "-q", "tempa/20261106-locks"]);
+    write(d.path(), "app/bun.lock", &"x\n".repeat(200));
+    write(d.path(), "app/src-tauri/Cargo.lock", &"x\n".repeat(200));
+    write(d.path(), "web/package-lock.json", &"x\n".repeat(200));
+    write(d.path(), "src/x.rs", "x\n");
+    add_plan_and_change(d.path(), "20261106-locks");
+    commit(d.path(), "locks");
+    let f = check(d.path(), &contract()).unwrap();
+    assert!(!codes(&f).contains(&"task.diff_too_large"), "{f:?}");
+
+    write(d.path(), "src/big.rs", &"x\n".repeat(100));
+    commit(d.path(), "big");
+    let f = check(d.path(), &contract()).unwrap();
+    assert!(codes(&f).contains(&"task.diff_too_large"), "{f:?}");
+}

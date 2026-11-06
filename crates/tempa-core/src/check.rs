@@ -16,6 +16,21 @@ pub struct CheckOpts {
     pub base: Option<String>,
 }
 
+/// Generated dependency lockfiles; not counted toward `max_diff_lines`.
+pub const LOCKFILES: [&str; 11] = [
+    "Cargo.lock",
+    "bun.lock",
+    "bun.lockb",
+    "package-lock.json",
+    "yarn.lock",
+    "pnpm-lock.yaml",
+    "poetry.lock",
+    "uv.lock",
+    "Gemfile.lock",
+    "composer.lock",
+    "go.sum",
+];
+
 const MANIFESTS: [&str; 10] = [
     "package.json",
     "Cargo.toml",

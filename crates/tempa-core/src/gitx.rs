@@ -93,13 +93,15 @@ pub fn added_files(root: &Path, base: &str) -> Result<Vec<String>> {
     )?))
 }
 
-/// Added + deleted lines between `base` and HEAD; binary files count 0.
+/// Added + deleted lines between `base` and HEAD; binary files and lockfiles
+/// (`crate::check::LOCKFILES`, generated, not reviewed) count 0.
 pub fn diff_lines(root: &Path, base: &str, exclude: &BTreeSet<String>) -> Result<u32> {
     let mut total = 0u32;
     for line in git(root, &["diff", "--numstat", base, "HEAD"])?.lines() {
         let mut parts = line.splitn(3, '\t');
         let (a, d, path) = (parts.next(), parts.next(), parts.next().unwrap_or(""));
-        if exclude.contains(path) {
+        let name = path.rsplit('/').next().unwrap_or(path);
+        if exclude.contains(path) || crate::check::LOCKFILES.contains(&name) {
             continue;
         }
         total += a.and_then(|x| x.parse::<u32>().ok()).unwrap_or(0);

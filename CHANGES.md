@@ -41,3 +41,10 @@
 - Decision: docs/decisions/2026-11-06-mcp-server-on-serde-json.md
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-lockfiles-not-counted
+- Ringkasan: Lockfiles do not count toward the diff gate
+- Alasan: Generated, not reviewed; the M2 app scaffold would fail the gate on lockfiles alone
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

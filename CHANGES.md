@@ -198,6 +198,6 @@
 ## 2026-11-06 · 20261106-license-and-crate-metadata
 - Ringkasan: Dual MIT OR Apache-2.0 license; crates.io metadata for tempa-cli and tempa-core
 - Alasan: prepare release and distribution
-- Decision: -
+- Decision: docs/decisions/2026-11-06-publish-as-tempa-cli.md
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5

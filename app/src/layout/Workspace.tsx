@@ -9,7 +9,7 @@ const nextId = (p: string) => `${p}${++seq}`;
 const mac = navigator.platform.toLowerCase().includes("mac");
 
 /** Tabs of split panes; every pane is one terminal in `cwd`. */
-export default function Workspace({ cwd }: { cwd: string | null }) {
+export default function Workspace({ cwd, active: shown }: { cwd: string | null; active: boolean }) {
   const [s, dispatch] = useReducer(reduce, empty, (e) => reduce(e, { type: "new", tab: nextId("t"), pane: nextId("p") }));
   const active = s.tabs.find((t) => t.id === s.active);
 
@@ -22,6 +22,7 @@ export default function Workspace({ cwd }: { cwd: string | null }) {
 
   useEffect(() => {
     // Capture phase: runs before xterm's textarea sees the key.
+    if (!shown) return; // only the visible project's workspace takes shortcuts
     const onKey = (e: KeyboardEvent) => {
       const cmd = shortcut(e, mac);
       if (!cmd) return;
@@ -94,7 +95,7 @@ export default function Workspace({ cwd }: { cwd: string | null }) {
             >
               <Terminal
                 cwd={cwd}
-                focused={t.id === s.active && t.focus === id}
+                focused={shown && t.id === s.active && t.focus === id}
                 onExit={() => dispatch({ type: "closePane", pane: id })}
               />
             </div>

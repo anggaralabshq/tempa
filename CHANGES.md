@@ -159,3 +159,10 @@
 - Decision: docs/decisions/2026-11-06-task-base-in-git-config.md
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-check-task-base
+- Ringkasan: tempa check measures a task against the branch it started from; doctor says off instead of M3; repo hooks in English
+- Alasan: milestone branches (m4) failed the pre-push gates against main
+- Decision: docs/decisions/2026-11-06-task-base-in-git-config.md
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

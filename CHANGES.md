@@ -76,3 +76,9 @@
 - Decision: docs/decisions/2026-11-06-folder-picker-dialog-plugin.md
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+## 2026-11-06 · 20261106-app-harness-ci
+- Ringkasan: App checks in the harness; Windows backend tests in CI
+- Alasan: Owner decision: one gate for CLI and app; Windows must work in M2
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

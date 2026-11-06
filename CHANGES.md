@@ -131,3 +131,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-freeze-m3-wiring
+- Ringkasan: Freeze M3 (1/3): CI once per milestone; app back to M2 wiring, chat, agents, host MCP and verify removed
+- Alasan: owner refocused tempa on contract sync; M3 lives on branch m3
+- Decision: docs/decisions/2026-11-06-refocus-on-contract-sync.md
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

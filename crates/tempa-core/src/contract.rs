@@ -6,7 +6,35 @@ use crate::source::walk;
 use crate::{Finding, Result};
 use std::path::Path;
 
-pub const CHANGE_FIELDS: [&str; 5] = ["Ringkasan", "Alasan", "Decision", "Harness", "Agent"];
+pub const CHANGE_FIELDS: [&str; 5] = ["Summary", "Reason", "Decision", "Harness", "Agent"];
+
+/// Indonesian vocabulary of tempa 0.1 (default headings and change fields), still accepted
+/// so repos written before 1.0 keep passing.
+const LEGACY: [(&str, &str); 15] = [
+    ("Commands", "Perintah"),
+    ("Conventions", "Konvensi"),
+    ("Off-limits", "Area terlarang"),
+    ("Goal", "Tujuan"),
+    ("Steps", "Langkah"),
+    ("Files touched", "File yang disentuh"),
+    ("Risks", "Risiko"),
+    ("Context", "Konteks"),
+    ("Options", "Opsi"),
+    ("Decision", "Keputusan"),
+    ("Consequences", "Konsekuensi"),
+    ("Definition of done", "Definisi selesai"),
+    ("Gates", "Gate yang berlaku"),
+    ("Summary", "Ringkasan"),
+    ("Reason", "Alasan"),
+];
+
+/// `have` names the heading or field `want` (case-insensitive, or its 0.1 Indonesian name).
+pub fn same_name(want: &str, have: &str) -> bool {
+    have.eq_ignore_ascii_case(want)
+        || LEGACY
+            .iter()
+            .any(|(en, id)| want.eq_ignore_ascii_case(en) && have.eq_ignore_ascii_case(id))
+}
 
 /// Required headings that are missing or empty: `(heading, "missing" | "empty")`.
 /// Case-insensitive, any heading level; a body with only sub-headings is not empty.
@@ -14,13 +42,11 @@ pub fn require_headings(md: &str, required: &[String]) -> Vec<(String, &'static 
     let secs = sections(md);
     required
         .iter()
-        .filter_map(
-            |h| match secs.iter().find(|s| s.title.eq_ignore_ascii_case(h)) {
-                None => Some((h.clone(), "missing")),
-                Some(s) if s.body.trim().is_empty() => Some((h.clone(), "empty")),
-                Some(_) => None,
-            },
-        )
+        .filter_map(|h| match secs.iter().find(|s| same_name(h, &s.title)) {
+            None => Some((h.clone(), "missing")),
+            Some(s) if s.body.trim().is_empty() => Some((h.clone(), "empty")),
+            Some(_) => None,
+        })
         .collect()
 }
 
@@ -131,7 +157,7 @@ pub fn check_docs(root: &Path, cfg: &Config) -> Result<Vec<Finding>> {
         for e in parse_changes(&t) {
             let at = Some(docs.changes.clone());
             for field in CHANGE_FIELDS {
-                match e.fields.iter().find(|(k, _)| k == field) {
+                match e.fields.iter().find(|(k, _)| same_name(field, k)) {
                     Some((_, v)) if !v.is_empty() => {
                         if field == "Decision" && v != "-" && !root.join(v).is_file() {
                             f.push(Finding::error(

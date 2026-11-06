@@ -136,3 +136,35 @@ fn custom_headings_override() {
         "{f:?}"
     );
 }
+
+#[test]
+fn default_vocabulary_is_english_and_legacy_indonesian_still_passes() {
+    let h = tempa_core::config::Config::parse(&tempa_core::config::default_toml("x"))
+        .unwrap()
+        .headings;
+    assert_eq!(
+        h.context,
+        ["Stack", "Commands", "Conventions", "Off-limits"]
+    );
+    assert_eq!(h.plan, ["Goal", "Steps", "Files touched", "Risks"]);
+    assert_eq!(
+        h.decisions,
+        [
+            "Context",
+            "Options",
+            "Decision",
+            "Consequences",
+            "Agent + model"
+        ]
+    );
+    assert_eq!(h.harness, ["Definition of done", "Gates"]);
+    // Repos written before 1.0 keep their Indonesian headings.
+    let old = "## Stack\nx\n## Perintah\nx\n## Konvensi\nx\n## Area terlarang\nx\n";
+    assert!(tempa_core::contract::require_headings(old, &h.context).is_empty());
+    let new = "## Stack\nx\n## Commands\nx\n## Conventions\nx\n## Off-limits\nx\n";
+    assert!(tempa_core::contract::require_headings(new, &h.context).is_empty());
+    assert_eq!(
+        tempa_core::contract::require_headings("## Stack\nx\n", &h.context).len(),
+        3
+    );
+}

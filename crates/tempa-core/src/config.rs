@@ -84,16 +84,16 @@ fn strings(xs: &[&str]) -> Vec<String> {
 impl Default for Headings {
     fn default() -> Self {
         Headings {
-            context: strings(&["Stack", "Perintah", "Konvensi", "Area terlarang"]),
-            plan: strings(&["Tujuan", "Langkah", "File yang disentuh", "Risiko"]),
+            context: strings(&["Stack", "Commands", "Conventions", "Off-limits"]),
+            plan: strings(&["Goal", "Steps", "Files touched", "Risks"]),
             decisions: strings(&[
-                "Konteks",
-                "Opsi",
-                "Keputusan",
-                "Konsekuensi",
+                "Context",
+                "Options",
+                "Decision",
+                "Consequences",
                 "Agent + model",
             ]),
-            harness: strings(&["Definisi selesai", "Gate yang berlaku"]),
+            harness: strings(&["Definition of done", "Gates"]),
         }
     }
 }

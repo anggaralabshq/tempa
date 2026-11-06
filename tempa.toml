@@ -1,0 +1,33 @@
+# Konfigurasi Tempa. Satu-satunya sumber aturan proyek.
+[project]
+name = "tempa"
+tempa_version = "0.1.0"
+
+[docs]            # peran → nama file, bebas diganti
+context   = "AGENTS.md"
+plan      = "docs/plans/"
+decisions = "docs/decisions/"
+changes   = "CHANGES.md"
+harness   = "HARNESS.md"
+
+[agents]
+enabled = ["claude", "codex", "gemini", "opencode", "cursor"]
+
+[harness]         # dijalankan berurutan; semua harus exit 0
+format = "cargo fmt --check"
+lint   = "cargo clippy --workspace --all-targets -- -D warnings"
+test   = "cargo test --workspace"
+
+[gates]
+plan_before_edit      = true
+review_required       = false
+decision_required_for = ["new-dependency", "schema-change", "public-api"]
+schema_paths          = []
+public_api_paths      = ["crates/tempa-core/src/lib.rs"]
+max_diff_lines        = 800
+protected_paths       = [".env*", ".github/workflows/**", "tempa.toml"]
+
+[ci]
+base            = "main"
+skip_authors    = ["renovate[bot]"]
+docs_only_paths = ["docs/**", "*.md"]

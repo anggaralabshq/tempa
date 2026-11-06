@@ -54,7 +54,13 @@ fn pr_body_lists_only_decision_docs_reports_harness_and_keeps_heading_levels() {
 fn harness_failure_message_contains_output_tail() {
     let d = valid_repo();
     let mut cfg = Config::load(d.path()).unwrap();
-    cfg.harness = vec![("test".into(), "printf 'baris-%s' penting; exit 3".into())];
+    // Harness commands run through `sh -c`, or `cmd /C` on Windows.
+    let cmd = if cfg!(windows) {
+        "echo baris-penting& exit 3"
+    } else {
+        "printf 'baris-%s' penting; exit 3"
+    };
+    cfg.harness = vec![("test".into(), cmd.into())];
     let f = run_harness(d.path(), &cfg).unwrap();
     assert_eq!(f.len(), 1);
     assert!(

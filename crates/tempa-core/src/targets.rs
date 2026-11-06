@@ -42,7 +42,7 @@ pub fn managed_dirs(agent: Agent) -> &'static [&'static str] {
         Agent::Codex => &[".agents/skills"],
         Agent::Gemini => &[".gemini/commands", ".gemini/agents", ".agents/skills"],
         Agent::Opencode => &[".opencode/commands", ".opencode/agents", ".agents/skills"],
-        Agent::Cursor => &[".cursor/commands", ".agents/skills"],
+        Agent::Cursor => &[".cursor/commands", ".cursor/agents", ".agents/skills"],
     }
 }
 
@@ -103,17 +103,67 @@ fn yaml_scalar(v: &str) -> String {
     }
 }
 
-/// `${VAR}` (Claude/Cursor/Gemini syntax) → OpenCode `{env:VAR}`.
-fn opencode_env(v: &str) -> String {
+/// Rewrite each `${VAR}` (source syntax) with `f(VAR)`.
+fn env_refs(v: &str, f: impl Fn(&str) -> String) -> String {
     let mut out = String::new();
     let mut rest = v;
     while let Some(i) = rest.find("${") {
         let Some(j) = rest[i..].find('}') else { break };
         out.push_str(&rest[..i]);
-        out.push_str(&format!("{{env:{}}}", &rest[i + 2..i + j]));
+        out.push_str(&f(&rest[i + 2..i + j]));
         rest = &rest[i + j + 1..];
     }
     out + rest
+}
+
+/// `${VAR}` → OpenCode `{env:VAR}`.
+fn opencode_env(v: &str) -> String {
+    env_refs(v, |n| format!("{{env:{n}}}"))
+}
+
+/// `${VAR}` → Cursor `${env:VAR}` (cursor.com/docs/context/mcp), in every string.
+fn cursor_env(v: &mut Value) {
+    match v {
+        Value::String(s) => {
+            *s = env_refs(s, |n| match n.strip_prefix("env:") {
+                Some(_) => format!("${{{n}}}"),
+                None => format!("${{env:{n}}}"),
+            })
+        }
+        Value::Array(a) => a.iter_mut().for_each(cursor_env),
+        Value::Object(m) => m.values_mut().for_each(cursor_env),
+        _ => {}
+    }
+}
+
+/// Subagent with `name` (default: file stem) and `description` frontmatter.
+fn named_agent(a: &Item) -> String {
+    let name = front_get(a, "name").unwrap_or_else(|| stem(&a.rel));
+    let mut pairs = vec![("name", name)];
+    if let Some(d) = front_get(a, "description") {
+        pairs.push(("description", d));
+    }
+    with_header(Some(&front_of(&pairs)), &a.body)
+}
+
+/// Append one deny rule per protected path to `v.permissions.deny`, keeping what is there.
+fn merge_deny(v: &mut Map<String, Value>, cfg: &Config, rule: impl Fn(&str) -> String) {
+    let perms = v.entry("permissions").or_insert_with(|| json!({}));
+    if !perms.is_object() {
+        *perms = json!({});
+    }
+    let perms = perms.as_object_mut().expect("object");
+    let mut deny: Vec<Value> = perms
+        .get("deny")
+        .and_then(|d| d.as_array().cloned())
+        .unwrap_or_default();
+    for p in &cfg.gates.protected_paths {
+        let r = json!(rule(p.trim_start_matches("./").trim_start_matches('/')));
+        if !deny.contains(&r) {
+            deny.push(r);
+        }
+    }
+    perms.insert("deny".into(), Value::Array(deny));
 }
 
 fn opencode_map(m: &std::collections::BTreeMap<String, String>) -> Value {
@@ -411,29 +461,7 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
 
             let path = ".claude/settings.json";
             let mut v = base_json(src, path);
-            let perms = v.entry("permissions").or_insert_with(|| json!({}));
-            if !perms.is_object() {
-                *perms = json!({});
-            }
-            let perms = perms.as_object_mut().expect("object");
-            let mut deny: Vec<Value> = perms
-                .get("deny")
-                .and_then(|d| d.as_array().cloned())
-                .unwrap_or_default();
-            let seen: BTreeSet<String> = deny
-                .iter()
-                .filter_map(|d| d.as_str().map(String::from))
-                .collect();
-            for p in &cfg.gates.protected_paths {
-                let rule = format!(
-                    "Edit(/{})",
-                    p.trim_start_matches("./").trim_start_matches('/')
-                );
-                if !seen.contains(&rule) {
-                    deny.push(json!(rule));
-                }
-            }
-            perms.insert("deny".into(), Value::Array(deny));
+            merge_deny(&mut v, cfg, |p| format!("Edit(/{p})"));
             if inject {
                 // Claude Code asks before starting a project `.mcp.json` server unless listed here.
                 let list = v
@@ -485,15 +513,7 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 o.file(format!(".gemini/commands/{rel}.toml"), t);
             }
             for a in &src.agents {
-                let name = front_get(a, "name").unwrap_or_else(|| stem(&a.rel));
-                let mut pairs = vec![("name", name)];
-                if let Some(d) = front_get(a, "description") {
-                    pairs.push(("description", d));
-                }
-                o.file(
-                    format!(".gemini/agents/{}", a.rel),
-                    with_header(Some(&front_of(&pairs)), &a.body),
-                );
+                o.file(format!(".gemini/agents/{}", a.rel), named_agent(a));
             }
             skills(o, src, ".agents/skills");
             deny_gaps(o, cfg);
@@ -569,32 +589,37 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
             }
         }
         Agent::Cursor => {
-            let front = front_of(&[
-                ("description", "Project instructions (generated by tempa)"),
-                ("alwaysApply", "true"),
-            ]);
-            o.file(
-                ".cursor/rules/tempa.mdc",
-                with_header(Some(&front), &src.agents_md),
-            );
+            // Context: Cursor reads AGENTS.md itself (cursor.com/docs/rules).
             for c in &src.commands {
                 o.file(
                     format!(".cursor/commands/{}", c.rel),
                     with_header(None, &c.body),
                 );
             }
-            for a in &src.agents {
-                o.gap("agents", &a.rel);
+            // Cursor also reads .claude/agents/ (cursor.com/docs/subagents): no duplicate.
+            if !cfg.agents.enabled.contains(&Agent::Claude) {
+                for a in &src.agents {
+                    o.file(format!(".cursor/agents/{}", a.rel), named_agent(a));
+                }
             }
             skills(o, src, ".agents/skills");
-            deny_gaps(o, cfg);
-            mcp_file(
-                o,
-                src,
-                ".cursor/mcp.json",
-                "mcpServers",
-                |u| json!({"type":"http","url":u}),
-            );
+
+            // cursor.com/docs/cli/reference/permissions: the CLI honours this; the IDE may not.
+            let path = ".cursor/cli.json";
+            let mut v = base_json(src, path);
+            merge_deny(&mut v, cfg, |p| format!("Write({p})"));
+            o.file(path, pretty(&v));
+
+            let path = ".cursor/mcp.json";
+            if !src.mcp.is_empty() || src.bases.contains_key(path) {
+                let mut v = base_json(src, path);
+                if !src.mcp.is_empty() {
+                    let mut servers = mcp_map(src, |u| json!({"type":"http","url":u}));
+                    cursor_env(&mut servers);
+                    v.insert("mcpServers".into(), servers);
+                }
+                o.file(path, pretty(&v));
+            }
         }
     }
     out.r

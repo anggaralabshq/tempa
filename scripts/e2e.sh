@@ -47,10 +47,11 @@ echo "$OUT" | grep -q "drift.modified" || fail "harus drift.modified:\n$OUT"
 git add CLAUDE.md
 expect_code 1 git commit -qm "edit target langsung"
 git reset -q CLAUDE.md && git checkout -q CLAUDE.md
-printf '\nAturan baru dari e2e.\n' >> AGENTS.md
-git add AGENTS.md
-expect_code 0 git commit -qm "ubah AGENTS.md"
-git show --name-only --format= HEAD | grep -q ".cursor/rules/tempa.mdc" || fail "commit tidak berisi tempa.mdc ter-update"
+CMD=$(cd .tempa/commands && find . -name "*.md" -type f | sed "s|^./||" | sort | head -1)
+printf '\nAturan baru dari e2e.\n' >> ".tempa/commands/$CMD"
+git add ".tempa/commands/$CMD"
+expect_code 0 git commit -qm "ubah command"
+git show --name-only --format= HEAD | grep -q ".claude/commands/$CMD" || fail "commit tidak berisi .claude/commands/$CMD ter-update"
 expect_code 0 tempa sync --check
 
 echo "== langkah 5: siklus task"

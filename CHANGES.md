@@ -166,3 +166,10 @@
 - Decision: docs/decisions/2026-11-06-task-base-in-git-config.md
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-cursor-native
+- Ringkasan: Cursor target follows current docs: AGENTS.md native (no tempa.mdc), MCP ${env:VAR}, .cursor/agents, CLI deny in .cursor/cli.json
+- Alasan: m4 format verification against official Cursor docs
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

@@ -1,0 +1,1 @@
+{"permissions":{"deny":["Edit(./.env*)","Read(./secrets/**)","Bash(rm -rf:*)"]},"hooks":{"PostToolUse":[{"matcher":"Edit","hooks":[{"type":"command","command":"cargo fmt --check"}]},{"matcher":"Write","hooks":[{"type":"command","command":"jq -r .tool_input.file_path | xargs prettier --write"}]}]}}

@@ -2,6 +2,8 @@
 
 pub mod config;
 pub mod date;
+pub mod md;
+pub mod source;
 
 use std::fmt;
 

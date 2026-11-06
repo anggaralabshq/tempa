@@ -12,7 +12,7 @@ A release is a version tag. `.github/workflows/release.yml` does the rest.
 
 1. Set `version` in the workspace `Cargo.toml` (both crates inherit it) and in `crates/tempa-cli/Cargo.toml`'s `tempa-core` dependency.
 2. Run the checks in `HARNESS.md`; merge to `main`.
-3. Tag and push: `git tag v1.2.3 && git push origin v1.2.3`.
+3. Tag and push: `git tag v1.2.3 && git push origin v1.2.3`. The workflow stops before publishing anything if the tag does not match the version (`scripts/check-version.sh`).
 4. The workflow builds `tempa-v1.2.3-<target>` archives (macOS arm64/x86_64, Linux arm64/x86_64 musl, Windows x86_64) with `.sha256` files, attaches them to the GitHub Release, publishes `tempa-core` then `tempa-cli` to crates.io, and writes `Formula/tempa.rb` in the tap (`scripts/homebrew-formula.sh`).
 5. Check: `brew install anggaralabshq/tap/tempa && tempa --version`.
 

@@ -1,0 +1,17 @@
+[package]
+name = "tempa-cli"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "tempa"
+path = "src/main.rs"
+
+[dependencies]
+tempa-core = { path = "../tempa-core" }
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3"

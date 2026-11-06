@@ -138,3 +138,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-m3-chat-tab
+- Ringkasan: Agent chat tab: agent picker, chat pane with permission cards (Allow once / Reject), model select, JSONL transcript per session
+- Alasan: M3 Task 3: talk to the five agents over ACP from the app
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

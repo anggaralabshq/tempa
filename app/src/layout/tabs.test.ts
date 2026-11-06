@@ -42,3 +42,14 @@ test("closing the active tab activates the previous one; last tab leaves none", 
   s = reduce(s, { type: "closeTab", tab: "t1" });
   expect(s).toEqual(empty);
 });
+
+test("newChat opens a chat tab; closing its pane forgets the chat", () => {
+  const chat = { agent: "claude", task: null, cwd: "/r" };
+  let s = reduce(empty, { type: "newChat", tab: "t1", pane: "p1", chat });
+  expect(s.active).toBe("t1");
+  expect(s.chats.p1).toEqual(chat);
+  s = reduce(s, { type: "split", dir: "row", pane: "p2" });
+  expect(s.chats.p2).toBeUndefined(); // a split opens a terminal
+  s = reduce(s, { type: "closePane", pane: "p1" });
+  expect(s.chats.p1).toBeUndefined();
+});

@@ -426,3 +426,45 @@ fn init_refuses_repo_with_agent_context() {
         Some("CLAUDE.md")
     );
 }
+
+// m4 review: servers in an existing .github/mcp.json are absorbed, not dropped on sync.
+#[test]
+fn import_absorbs_copilot_mcp_servers() {
+    let d = valid_repo();
+    let p = d.path();
+    write(
+        p,
+        ".github/mcp.json",
+        r#"{"mcpServers":{"gh":{"type":"http","url":"https://api.example/mcp","tools":["*"]}}}"#,
+    );
+    let r = tempa_core::import::import(p, true).unwrap();
+    assert!(r.gaps.iter().all(|g| !g.contains("gh")), "{:?}", r.gaps);
+    assert!(read(p, ".tempa/mcp.toml").contains("gh"));
+    let v: serde_json::Value = serde_json::from_str(&read(p, ".github/mcp.json")).unwrap();
+    assert_eq!(v["mcpServers"]["gh"]["url"], "https://api.example/mcp");
+    let v: serde_json::Value = serde_json::from_str(&read(p, ".mcp.json")).unwrap();
+    assert_eq!(v["mcpServers"]["gh"]["url"], "https://api.example/mcp");
+}
+
+// m4 review: Cursor's ${env:X} round-trips; its built-in variables are not env vars.
+#[test]
+fn cursor_mcp_variables_round_trip() {
+    let d = valid_repo();
+    let p = d.path();
+    write(
+        p,
+        ".cursor/mcp.json",
+        r#"{"mcpServers":{"pg":{"command":"npx","args":["${workspaceFolder}/db"],"env":{"DB":"${env:DB_URL}"}}}}"#,
+    );
+    tempa_core::import::import(p, true).unwrap();
+    let cursor: serde_json::Value = serde_json::from_str(&read(p, ".cursor/mcp.json")).unwrap();
+    assert_eq!(cursor["mcpServers"]["pg"]["env"]["DB"], "${env:DB_URL}");
+    assert_eq!(
+        cursor["mcpServers"]["pg"]["args"][0],
+        "${workspaceFolder}/db"
+    );
+    let claude: serde_json::Value = serde_json::from_str(&read(p, ".mcp.json")).unwrap();
+    assert_eq!(claude["mcpServers"]["pg"]["env"]["DB"], "${DB_URL}");
+    let opencode: serde_json::Value = serde_json::from_str(&read(p, "opencode.json")).unwrap();
+    assert_eq!(opencode["mcp"]["pg"]["environment"]["DB"], "{env:DB_URL}");
+}

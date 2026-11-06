@@ -264,3 +264,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-mcp-import-fixes
+- Summary: Import absorbs .github/mcp.json servers; Cursor MCP variables round-trip
+- Reason: m4 review: user MCP servers could be dropped or broken by sync
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

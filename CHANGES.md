@@ -118,3 +118,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-readme-why-tempa
+- Summary: README: Why tempa section instead of a competitor comparison
+- Reason: Owner: the README should not send readers to other tools
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

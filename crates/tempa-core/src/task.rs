@@ -50,7 +50,11 @@ pub fn task_new(root: &Path, slug: &str) -> Result<String> {
     if root.join(&path).exists() {
         return Err(Error(format!("{path} already exists")));
     }
+    let from = gitx::current_branch(root).ok();
     gitx::switch_new(root, &format!("tempa/{id}"))?;
+    if let Some(from) = from {
+        gitx::set_task_base(root, &from)?;
+    }
     write_atomic(&root.join(&path), PLAN.replace("{id}", &id).as_bytes())?;
     Ok(id)
 }

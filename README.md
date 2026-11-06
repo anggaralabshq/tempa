@@ -22,6 +22,8 @@ cargo install tempa-cli --locked         # any platform with Rust 1.85+
 
 Or download a binary for macOS, Linux or Windows from [Releases](https://github.com/anggaralabshq/tempa/releases). tempa needs git on PATH. From a clone: `cargo install --path crates/tempa-cli --locked`.
 
+The Homebrew, crates.io and Releases installs are available from the first release (v0.1.0). Before that, install from a clone.
+
 ## Quick start
 
 An existing repo with agent files (`CLAUDE.md`, `.claude/`, `.cursorrules`, ...):
@@ -100,6 +102,17 @@ Upgrading a repo that already has its own `.mcp.json`, `.cursor/mcp.json`, `open
 
 Optional, and can come later. Local hooks can be skipped with `--no-verify`, so a CI step closes that gap. [`docs/tempa-devops.md`](crates/tempa-core/src/templates/devops.md) (written into your repo by `tempa init`) has ready-made Bitbucket Pipelines and GitHub Actions steps. Build the image with `docker build -t tempa:0.1.0 .`.
 
+## How tempa compares
+
+[rulesync](https://github.com/dyoshikawa/rulesync), [ruler](https://github.com/intellectronica/ruler), [ai-rulez](https://github.com/Goldziher/ai-rulez) and [APM](https://github.com/microsoft/apm) also generate agent files from one source, and cover far more agents (30 to 60+). If you need the widest coverage, use one of them.
+
+tempa covers six agents and goes further on keeping a team's committed configuration honest:
+
+- Direct edits to generated files are detected and absorbed back into the source, not overwritten.
+- `tempa check` gates the contract itself in CI: required headings, protected paths, harness commands, diff size, decision records for dependency changes.
+- `tempa doctor` reports, per agent, what it gets and what it cannot get (the gaps).
+- An optional task workflow (plan, decision, changes entry, pull request body) that is the same whichever agent did the work.
+
 ## Development
 
 ```sh
@@ -109,7 +122,7 @@ cargo fmt --check
 cargo build --release -p tempa-cli && scripts/e2e.sh target/release/tempa
 ```
 
-This repo uses tempa on itself; see `AGENTS.md` and `HARNESS.md`.
+This repo uses tempa on itself; see `AGENTS.md` and `HARNESS.md`. `app/` holds an experimental desktop app that is frozen; the CLI is the product. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
 ## License
 

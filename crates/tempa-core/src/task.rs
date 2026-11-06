@@ -63,6 +63,27 @@ pub fn current_task_id(root: &Path) -> Result<String> {
         .ok_or_else(|| Error(format!("{branch} is not a task branch; use tempa task new")))
 }
 
+/// Lifecycle states a plan's frontmatter may hold, in order.
+pub const STATES: [&str; 5] = ["plan", "approved", "implement", "verify", "record"];
+
+/// Set the current task's `state` (the desktop host moves it after approval).
+pub fn set_state(root: &Path, state: &str) -> Result<()> {
+    if !STATES.contains(&state) {
+        return Err(Error(format!(
+            "unknown state \"{state}\"; use one of {}",
+            STATES.join(", ")
+        )));
+    }
+    let cfg = Config::load(root)?;
+    let path = plan_path(&cfg, &current_task_id(root)?);
+    let text = std::fs::read_to_string(root.join(&path))
+        .map_err(|_| Error(format!("{path} not found")))?;
+    write_atomic(
+        &root.join(&path),
+        set_front(&text, "state", state).as_bytes(),
+    )
+}
+
 pub fn task_approve(root: &Path) -> Result<()> {
     let cfg = Config::load(root)?;
     let path = plan_path(&cfg, &current_task_id(root)?);

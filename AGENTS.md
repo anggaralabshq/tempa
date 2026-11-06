@@ -7,7 +7,6 @@ Rust CLI that keeps one context contract (AGENTS.md + `.tempa/` + `tempa.toml`) 
 - Rust edition 2024, MSRV 1.85 (CI image `rust:1.85-alpine`); local toolchain stable.
 - Workspace: `crates/tempa-core` (library, all logic) and `crates/tempa-cli` (binary `tempa`, clap, thin).
 - Git is called through the `git` CLI (`crates/tempa-core/src/gitx.rs`), not libgit2.
-- `app/` is a Tauri desktop app, frozen: keep its tests green, add no features.
 
 ## Commands
 

@@ -4,7 +4,7 @@ Thanks for helping. tempa is developed with tempa, so a change follows the same 
 
 ## Setup
 
-- Rust 1.85+ and git. The pre-push hook also runs the tests of the frozen desktop app in `app/`, which need [Bun](https://bun.sh) and the [Tauri system dependencies](https://tauri.app/start/prerequisites/).
+- Rust 1.85+ and git.
 - `cargo install --path crates/tempa-cli --locked`, then `tempa init` once per clone to install the hooks.
 
 ## A change

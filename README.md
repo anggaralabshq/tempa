@@ -122,7 +122,7 @@ cargo fmt --check
 cargo build --release -p tempa-cli && scripts/e2e.sh target/release/tempa
 ```
 
-This repo uses tempa on itself; see `AGENTS.md` and `HARNESS.md`. `app/` holds an experimental desktop app that is frozen; the CLI is the product. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
+This repo uses tempa on itself; see `AGENTS.md` and `HARNESS.md`. An experimental desktop app lives on the frozen [`desktop-app`](https://github.com/anggaralabshq/tempa/tree/desktop-app) branch; the CLI is the product. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
 ## License
 

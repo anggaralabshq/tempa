@@ -1,43 +1,98 @@
 # tempa
 
-Satu kontrak konteks untuk semua coding agent. Tulis konteks proyek sekali di `AGENTS.md` dan `.tempa/`, lalu `tempa` meng-generate file yang dibaca Claude Code, Codex, Gemini CLI, OpenCode, dan Cursor. Engineer mana pun, dengan agent apa pun, mendapat konteks yang sama.
+One context contract and one workflow for every coding agent.
 
-## Instalasi
+Teams rarely use a single coding agent. One engineer lives in Claude Code, another in Codex, Gemini CLI, OpenCode or Cursor, and each reads a different set of files. Project knowledge piles up in one agent's format (usually `CLAUDE.md` and `.claude/`), and everyone else starts from zero. Output quality drifts with it.
+
+tempa keeps the contract in one neutral place and makes every agent read it, then holds every change to the same workflow:
+
+- **One source.** `AGENTS.md`, `.tempa/` (commands, subagents, skills, MCP servers) and `tempa.toml`. tempa generates what each agent reads: `CLAUDE.md`, `.claude/`, `.gemini/`, `.opencode/`, `opencode.json`, `.cursor/`, `.codex/config.toml`, `.agents/skills/`.
+- **No drift.** A lock file records what tempa wrote. Direct edits to generated files are detected, and can be absorbed back into the source instead of being lost.
+- **One workflow.** Every change is a task with a plan, an optional decision record, a changes entry naming the agent and model used, and a pull request body with the same structure, whichever agent did the work.
+- **Gates before CI.** Git hooks sync and check locally; the same `tempa check` runs in CI when you add it.
+
+Supported agents: Claude Code, Codex, Gemini CLI, OpenCode, Cursor. What each one supports, and where tempa has to fall back, is in [docs/target-matrix.md](docs/target-matrix.md); `tempa doctor` reports it per repo.
+
+## Install
 
 ```sh
 cargo install --path crates/tempa-cli --locked
 ```
 
-Butuh Rust 1.85+ dan git. Installer biner menunggu keputusan hosting.
+Requires Rust 1.85+ and git. Prebuilt binaries are not published yet.
 
-## Alur
+## Quick start
+
+An existing repo with agent files (`CLAUDE.md`, `.claude/`, `.cursorrules`, ...):
 
 ```sh
-tempa import --yes      # serap CLAUDE.md, .claude/, .cursorrules, dll. ke sumber netral (+ init bila belum ada tempa.toml)
-tempa init              # repo baru: tempa.toml, AGENTS.md, HARNESS.md, CHANGES.md, git hooks
-tempa task new <slug>   # branch tempa/<id> + file plan; isi plan lalu `tempa task approve`
-tempa log --summary .. --reason .. --agent "codex / gpt-5"   # entri CHANGES.md
-tempa pr-body           # body PR untuk Bitbucket
+tempa import          # dry run: shows what would be absorbed
+tempa import --yes    # writes AGENTS.md, .tempa/, tempa.toml, hooks; syncs every agent
+tempa doctor          # what each agent gets, and the gaps
 ```
 
-Pemeriksaan:
+A repo without agent files:
 
-- `tempa sync --check`: target agent sama dengan sumber? Hook pre-commit menjalankan `tempa sync --fix` otomatis.
-- `tempa check`: drift, kontrak dokumen, aturan task, dan harness. Hook pre-push menjalankannya. CI memakai `--contract-only`.
-- `tempa doctor`: paritas per agent, gap, dan file legacy.
+```sh
+tempa init            # tempa.toml, AGENTS.md, HARNESS.md, CHANGES.md, git hooks
+```
 
-Jangan edit file hasil generate (`CLAUDE.md`, `.claude/commands/`, `.gemini/`, dll.) secara langsung. Ubah sumbernya, atau serap editan dengan `tempa import --yes`. `tempa sync` tidak pernah menimpa file yang bukan buatannya atau yang sudah diedit; `tempa sync --force` menimpanya dengan sengaja.
+Each engineer runs `tempa init` once per clone to install the hooks (it never overwrites existing files).
 
-Hook pre-commit hanya men-sync dari sumber yang sudah di-stage (`git add`), dan ikut men-stage `.tempa/lock.json`.
+## Daily workflow
 
-## CI dan merge
+```sh
+tempa task new add-invoice     # branch tempa/<date>-add-invoice + plan file
+# fill in the plan, then a human approves it:
+tempa task approve
+tempa decide use-sqlite        # optional decision record
+# ...work with any agent...
+tempa log --summary "Add invoice endpoint" --reason "Billing v2" \
+          --harness pass --agent "codex / gpt-5"
+tempa pr-body                  # paste into the pull request
+```
 
-Serahkan [docs/tempa-devops.md](docs/tempa-devops.md) (dibuat `tempa init` di repo proyek) ke tim DevOps: satu step Bitbucket Pipelines dan merge check Premium.
+## Commands
 
-Image: `docker build -t tempa:0.1.0 .`
+| Command | What it does |
+|---|---|
+| `tempa init` | Create missing contract files and git hooks. Refuses repos that already have agent context; use `import` there. |
+| `tempa import [--yes]` | Absorb existing agent files into the neutral source, keep other keys of shared configs, then sync. |
+| `tempa sync` | Generate every agent's files. Never overwrites a file tempa did not write or one edited directly. |
+| `tempa sync --check` | Report drift without writing (for CI). |
+| `tempa sync --fix` | Pre-commit hook: sync from staged sources, stage outputs and the lock, block on drift. |
+| `tempa sync --force` | Overwrite generated files on purpose. |
+| `tempa check [--contract-only] [--base <branch>]` | Drift, contract documents, task rules, then the `[harness]` commands. |
+| `tempa doctor` | Per-agent parity: generated files, gaps, protected paths, legacy files, hook status. |
+| `tempa task new <slug>` / `tempa task approve` | Start a task; mark its plan approved. |
+| `tempa decide <slug>` | Create a decision record. |
+| `tempa log ...` | Append a changes entry for the current task. |
+| `tempa pr-body` | Print the pull request body for the current task. |
 
-Matriks target per agent: [docs/target-matrix.md](docs/target-matrix.md).
+Exit codes: `0` ok, `1` findings, `2` error.
 
-## Lisensi
+## Rules worth knowing
 
-Belum diputuskan.
+- Edit the source, not generated files. If you did edit a generated file, `tempa import --yes` absorbs it; `tempa sync --force` discards it.
+- The pre-commit hook only syncs from staged sources, so a commit never contains generated output for work you have not staged.
+- Plans are approved by a person (`tempa task approve`), never by an agent.
+- Configure the gates in `tempa.toml`: `[harness]` commands (format, lint, test), protected paths, required decisions, maximum diff size.
+
+## CI
+
+Optional, and can come later. Local hooks can be skipped with `--no-verify`, so a CI step closes that gap. [`docs/tempa-devops.md`](crates/tempa-core/src/templates/devops.md) (written into your repo by `tempa init`) has ready-made Bitbucket Pipelines and GitHub Actions steps. Build the image with `docker build -t tempa:0.1.0 .`.
+
+## Development
+
+```sh
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo fmt --check
+cargo build --release -p tempa-cli && scripts/e2e.sh target/release/tempa
+```
+
+This repo uses tempa on itself; see `AGENTS.md` and `HARNESS.md`.
+
+## License
+
+Not decided yet.

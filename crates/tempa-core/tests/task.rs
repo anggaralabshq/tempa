@@ -108,7 +108,7 @@ fn log_appends_valid_entry() {
     assert!(e.iter().all(|x| x.task_id == id));
     assert!(
         e[0].fields
-            .contains(&("Harness".to_string(), "belum".to_string()))
+            .contains(&("Harness".to_string(), "pending".to_string()))
     );
     assert!(
         e[0].fields

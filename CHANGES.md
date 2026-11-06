@@ -131,3 +131,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-ci-milestone-only
+- Ringkasan: CI runs once per milestone: PRs into main only, no push trigger, manual dispatch
+- Alasan: owner asked to cut CI runs to big milestones to save GitHub compute and dev time
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

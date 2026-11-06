@@ -75,12 +75,12 @@ pub fn check(root: &Path, opts: &CheckOpts) -> Result<Vec<Finding>> {
 
     f.extend(drift_findings(&drift(root)?));
 
-    let base_name = gitx::base_name(&cfg, opts.base.as_deref());
+    let base_name = gitx::base_name(root, &cfg, opts.base.as_deref());
     let base = gitx::resolve_base(root, &cfg, opts.base.as_deref());
     if base.is_none() {
         let msg = format!(
             "base branch {base_name} not found or history too shallow; task rules skipped. \
-             Di Bitbucket Pipelines pakai `clone: depth: full`"
+             On Bitbucket Pipelines use `clone: depth: full`"
         );
         f.push(
             if std::env::var("BITBUCKET_PR_ID").is_ok_and(|v| !v.is_empty()) {
@@ -234,9 +234,35 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
 }
 
 /// Run `[harness]` commands in order; stop at the first failure.
+/// Repository-local variables git exports to hooks (`git rev-parse --local-env-vars`).
+/// Harness commands run against `root`; inherited, these would point any git call in
+/// them (e.g. a test suite creating temp repos) at the repository being pushed.
+const GIT_LOCAL_ENV: [&str; 16] = [
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CONFIG",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG_COUNT",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_IMPLICIT_WORK_TREE",
+    "GIT_GRAFT_FILE",
+    "GIT_INDEX_FILE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_PREFIX",
+    "GIT_INTERNAL_SUPER_PREFIX",
+    "GIT_SHALLOW_FILE",
+    "GIT_COMMON_DIR",
+];
+
 pub fn run_harness(root: &Path, cfg: &Config) -> Result<Vec<Finding>> {
     for (name, cmd) in &cfg.harness {
-        let out = shell(cmd)
+        let mut c = shell(cmd);
+        for v in GIT_LOCAL_ENV {
+            c.env_remove(v);
+        }
+        let out = c
             .current_dir(root)
             .output()
             .map_err(|e| Error(format!("harness {name} could not run: {e}")))?;

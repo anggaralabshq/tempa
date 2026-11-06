@@ -1,0 +1,31 @@
+# Once per milestone: task PRs target a milestone branch and are gated by the local
+# hooks; the milestone PR into main runs this. workflow_dispatch runs it by hand.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --locked --no-fail-fast
+      - name: End-to-end
+        if: runner.os != 'Windows'
+        shell: bash
+        run: cargo build --release -p tempa-cli --locked && scripts/e2e.sh target/release/tempa

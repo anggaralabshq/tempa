@@ -1,9 +1,9 @@
-# Konfigurasi Tempa. Satu-satunya sumber aturan proyek.
+# tempa configuration: the single source of project rules.
 [project]
 name = "tempa"
 tempa_version = "0.1.0"
 
-[docs]            # peran → nama file, bebas diganti
+[docs]            # role → file name, rename freely
 context   = "AGENTS.md"
 plan      = "docs/plans/"
 decisions = "docs/decisions/"
@@ -11,15 +11,12 @@ changes   = "CHANGES.md"
 harness   = "HARNESS.md"
 
 [agents]
-enabled = ["claude", "codex", "gemini", "opencode", "cursor"]
+enabled = ["claude", "codex", "gemini", "opencode", "cursor", "copilot"]
 
-[harness]         # dijalankan berurutan; semua harus exit 0
+[harness]         # run in order; each must exit 0
 format = "cargo fmt --check"
 lint   = "cargo clippy --workspace --all-targets -- -D warnings"
 test   = "cargo test --workspace"
-app_check = "cd app && bun install --frozen-lockfile && bun run check"
-app_test  = "cd app && bun run test"
-app_rust  = "cargo clippy --manifest-path app/src-tauri/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path app/src-tauri/Cargo.toml"
 
 [gates]
 plan_before_edit      = true

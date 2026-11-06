@@ -2,7 +2,9 @@
 
 One context contract and one workflow for every coding agent.
 
-Teams rarely use a single coding agent. One engineer lives in Claude Code, another in Codex, Gemini CLI, OpenCode or Cursor, and each reads a different set of files. Project knowledge piles up in one agent's format (usually `CLAUDE.md` and `.claude/`), and everyone else starts from zero. Output quality drifts with it.
+![tempa importing a Claude Code repo, reporting per-agent parity, and absorbing a direct edit back into the source](docs/demo/demo.gif)
+
+Teams rarely use a single coding agent. One engineer lives in Claude Code, another in Codex, Gemini CLI, OpenCode, Cursor or GitHub Copilot, and each reads a different set of files. Project knowledge piles up in one agent's format (usually `CLAUDE.md` and `.claude/`), and everyone else starts from zero. Output quality drifts with it.
 
 tempa keeps the contract in one neutral place and makes every agent read it, then holds every change to the same workflow:
 
@@ -11,15 +13,18 @@ tempa keeps the contract in one neutral place and makes every agent read it, the
 - **One workflow.** Every change is a task with a plan, an optional decision record, a changes entry naming the agent and model used, and a pull request body with the same structure, whichever agent did the work.
 - **Gates before CI.** Git hooks sync and check locally; the same `tempa check` runs in CI when you add it.
 
-Supported agents: Claude Code, Codex, Gemini CLI, OpenCode, Cursor. What each one supports, and where tempa has to fall back, is in [docs/target-matrix.md](docs/target-matrix.md); `tempa doctor` reports it per repo.
+Supported agents: Claude Code, Codex, Gemini CLI, OpenCode, Cursor, GitHub Copilot. What each one supports, and where tempa has to fall back, is in [docs/target-matrix.md](docs/target-matrix.md); `tempa doctor` reports it per repo.
 
 ## Install
 
 ```sh
-cargo install --path crates/tempa-cli --locked
+brew install anggaralabshq/tap/tempa     # macOS, Linux
+cargo install tempa-cli --locked         # any platform with Rust 1.85+
 ```
 
-Requires Rust 1.85+ and git. Prebuilt binaries are not published yet.
+Or download a binary for macOS, Linux or Windows from [Releases](https://github.com/anggaralabshq/tempa/releases). tempa needs git on PATH. From a clone: `cargo install --path crates/tempa-cli --locked`.
+
+The Homebrew, crates.io and Releases installs are available from the first release (v0.1.0). Before that, install from a clone.
 
 ## Quick start
 
@@ -99,6 +104,17 @@ Upgrading a repo that already has its own `.mcp.json`, `.cursor/mcp.json`, `open
 
 Optional, and can come later. Local hooks can be skipped with `--no-verify`, so a CI step closes that gap. [`docs/tempa-devops.md`](crates/tempa-core/src/templates/devops.md) (written into your repo by `tempa init`) has ready-made Bitbucket Pipelines and GitHub Actions steps. Build the image with `docker build -t tempa:0.1.0 .`.
 
+## How tempa compares
+
+[rulesync](https://github.com/dyoshikawa/rulesync), [ruler](https://github.com/intellectronica/ruler), [ai-rulez](https://github.com/Goldziher/ai-rulez) and [APM](https://github.com/microsoft/apm) also generate agent files from one source, and cover far more agents (30 to 60+). If you need the widest coverage, use one of them.
+
+tempa covers six agents and goes further on keeping a team's committed configuration honest:
+
+- Direct edits to generated files are detected and absorbed back into the source, not overwritten.
+- `tempa check` gates the contract itself in CI: required headings, protected paths, harness commands, diff size, decision records for dependency changes.
+- `tempa doctor` reports, per agent, what it gets and what it cannot get (the gaps).
+- An optional task workflow (plan, decision, changes entry, pull request body) that is the same whichever agent did the work.
+
 ## Development
 
 ```sh
@@ -108,8 +124,8 @@ cargo fmt --check
 cargo build --release -p tempa-cli && scripts/e2e.sh target/release/tempa
 ```
 
-This repo uses tempa on itself; see `AGENTS.md` and `HARNESS.md`.
+This repo uses tempa on itself; see `AGENTS.md` and `HARNESS.md`. An experimental desktop app lives on the frozen [`desktop-app`](https://github.com/anggaralabshq/tempa/tree/desktop-app) branch; the CLI is the product. See [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).
 
 ## License
 
-Not decided yet.
+Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or [MIT license](LICENSE-MIT) at your option. Unless you explicitly state otherwise, any contribution you submit for inclusion in tempa, as defined in the Apache-2.0 license, is dual licensed as above, without any additional terms or conditions.

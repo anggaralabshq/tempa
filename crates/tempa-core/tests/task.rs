@@ -39,12 +39,7 @@ fn task_new_creates_branch_and_plan() {
         plan.starts_with(&format!("---\ntask_id: {id}\nstate: plan\n")),
         "{plan}"
     );
-    for h in [
-        "## Tujuan",
-        "## Langkah",
-        "## File yang disentuh",
-        "## Risiko",
-    ] {
+    for h in ["## Goal", "## Steps", "## Files touched", "## Risks"] {
         assert!(plan.contains(h));
     }
 }
@@ -137,11 +132,11 @@ fn pr_body_sections_in_order() {
     log(d.path(), &entry("lulus")).unwrap();
     let b = pr_body(d.path()).unwrap();
     let heads = [
-        "## Ringkasan",
-        "## Link plan",
-        "## Decision terkait",
-        "## Entri changes",
-        "## Hasil harness",
+        "## Summary",
+        "## Plan",
+        "## Decisions",
+        "## Changes",
+        "## Harness",
         "## Review",
         "## Agent + model",
     ];
@@ -181,14 +176,98 @@ fn full_cli_flow_passes_check() {
 }
 
 #[test]
-fn set_state_rejects_unknown_and_writes_known() {
+fn task_branch_checks_against_the_branch_it_started_from() {
     let d = valid_repo();
-    let id = task_new(d.path(), "states").unwrap();
-    let err = tempa_core::task::set_state(d.path(), "done").unwrap_err();
-    assert!(err.0.contains("implement"), "{}", err.0);
-    for s in tempa_core::task::STATES {
-        tempa_core::task::set_state(d.path(), s).unwrap();
-        let plan = read(d.path(), &format!("docs/plans/{id}.md"));
-        assert!(plan.contains(&format!("\nstate: {s}\n")), "{plan}");
+    git(d.path(), &["switch", "-q", "-c", "m4"]);
+    task_new(d.path(), "x").unwrap();
+    let cfg = tempa_core::config::Config::load(d.path()).unwrap();
+    assert_eq!(tempa_core::gitx::base_name(d.path(), &cfg, None), "m4");
+    // An explicit base still wins; a branch tempa did not create falls back to [ci].base.
+    assert_eq!(
+        tempa_core::gitx::base_name(d.path(), &cfg, Some("main")),
+        "main"
+    );
+    git(d.path(), &["switch", "-q", "-c", "other"]);
+    assert_eq!(
+        tempa_core::gitx::base_name(d.path(), &cfg, None),
+        cfg.ci.base
+    );
+}
+
+#[test]
+fn plan_and_pr_body_use_english_vocabulary_and_read_legacy_plans() {
+    let d = valid_repo();
+    let id = task_new(d.path(), "eng").unwrap();
+    let plan = read(d.path(), &format!("docs/plans/{id}.md"));
+    assert!(
+        plan.ends_with("---\n## Goal\n\n## Steps\n\n## Files touched\n\n## Risks\n"),
+        "{plan}"
+    );
+    // A plan written with the legacy headings still gives the PR its summary.
+    fill_plan(d.path(), &id);
+    log(d.path(), &entry("pass")).unwrap();
+    let changes = read(d.path(), "CHANGES.md");
+    assert!(
+        changes.contains("- Summary: Tambah endpoint invoice") && changes.contains("- Reason: "),
+        "{changes}"
+    );
+    let body = pr_body(d.path()).unwrap();
+    assert!(
+        body.starts_with("## Summary\n\nTambah invoice\n\n## Plan\n\n"),
+        "{body}"
+    );
+    for s in [
+        "## Decisions",
+        "## Changes",
+        "## Harness",
+        "## Review",
+        "## Agent + model",
+    ] {
+        assert!(body.contains(s), "{s}: {body}");
     }
+}
+
+#[test]
+fn legacy_change_fields_still_pass_the_contract() {
+    let d = valid_repo();
+    write(
+        d.path(),
+        "CHANGES.md",
+        "# Changes\n\n## 2026-11-01 · 20261101-x\n- Ringkasan: a\n- Alasan: b\n- Decision: -\n- Harness: pass\n- Agent: x\n",
+    );
+    let f = check(
+        d.path(),
+        &CheckOpts {
+            contract_only: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(
+        !f.iter().any(|x| x.code == "contract.change_field"),
+        "{f:?}"
+    );
+}
+
+#[test]
+fn detached_head_is_not_recorded_as_task_base() {
+    let d = valid_repo();
+    git(d.path(), &["switch", "-q", "--detach"]);
+    task_new(d.path(), "x").unwrap();
+    let cfg = tempa_core::config::Config::load(d.path()).unwrap();
+    assert_eq!(
+        tempa_core::gitx::base_name(d.path(), &cfg, None),
+        cfg.ci.base
+    );
+}
+
+#[test]
+fn pr_body_reverify_uses_the_task_base() {
+    let d = valid_repo();
+    git(d.path(), &["switch", "-q", "-c", "m4"]);
+    let id = task_new(d.path(), "x").unwrap();
+    fill_plan(d.path(), &id);
+    log(d.path(), &entry("pass")).unwrap();
+    let b = pr_body(d.path()).unwrap();
+    assert!(b.contains("tempa check --base m4"), "{b}");
 }

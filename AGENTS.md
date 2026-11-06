@@ -1,30 +1,30 @@
 # tempa
 
-CLI Rust yang menjaga satu kontrak konteks (AGENTS.md + `.tempa/` + `tempa.toml`) dan meng-generate file untuk Claude Code, Codex, Gemini CLI, OpenCode, dan Cursor.
+Rust CLI that keeps one context contract (AGENTS.md + `.tempa/` + `tempa.toml`) and generates the files Claude Code, Codex, Gemini CLI, OpenCode, Cursor and GitHub Copilot read.
 
 ## Stack
 
-- Rust edition 2024, MSRV 1.85 (image CI `rust:1.85-alpine`); toolchain lokal stable.
-- Workspace: `crates/tempa-core` (library, semua logika) dan `crates/tempa-cli` (binary `tempa`, clap, tipis).
-- Git dipanggil lewat CLI `git` (`crates/tempa-core/src/gitx.rs`), bukan libgit2.
+- Rust edition 2024, MSRV 1.85 (CI image `rust:1.85-alpine`); local toolchain stable.
+- Workspace: `crates/tempa-core` (library, all logic) and `crates/tempa-cli` (binary `tempa`, clap, thin).
+- Git is called through the `git` CLI (`crates/tempa-core/src/gitx.rs`), not libgit2.
 
-## Perintah
+## Commands
 
 - Test: `cargo test --workspace`
 - Lint: `cargo clippy --workspace --all-targets -- -D warnings`
-- Format: `cargo fmt --all` (cek: `cargo fmt --check`)
+- Format: `cargo fmt --all` (check: `cargo fmt --check`)
 - E2E: `cargo build --release -p tempa-cli && scripts/e2e.sh target/release/tempa`
 
-## Konvensi
+## Conventions
 
-- TDD: test yang gagal dulu, baru kode. Regresi dari review masuk `crates/tempa-core/tests/review_fixes.rs` atau file test modulnya.
-- Logika di `tempa-core` berupa fungsi murni sebisa mungkin; CLI hanya parsing argumen dan mencetak.
-- Semua teks untuk pengguna (pesan CLI, help, README, template) dalam Bahasa Inggris. Kosakata kontrak (heading wajib, field changes, section pr-body) tetap seperti di config.
-- Setiap temuan berbentuk `Finding { code, severity, path, message }`; kode stabil seperti `drift.modified`.
-- Jangan pernah menimpa file milik pengguna tanpa bukti tempa yang menulisnya (lock hash) atau `--force`.
-- Format target per agent hanya boleh berubah bersama `docs/target-matrix.md` dan sumber docs resminya.
+- TDD: failing test first, then code. Regressions found in review go to `crates/tempa-core/tests/review_fixes.rs` or the module's test file.
+- Logic in `tempa-core` is pure functions where possible; the CLI only parses arguments and prints.
+- All text in the repo and for users (CLI messages, help, README, templates, docs) is English.
+- Every finding is a `Finding { code, severity, path, message }`; codes are stable, e.g. `drift.modified`.
+- Never overwrite a user's file without proof tempa wrote it (lock hash) or `--force`.
+- A target format changes only together with `docs/target-matrix.md` and its official docs source.
 
-## Area terlarang
+## Off-limits
 
-- `crates/tempa-core/tests/fixtures/` hanya diubah bila test memang butuh data baru.
-- Jangan edit file hasil generate (`CLAUDE.md`, `.claude/`, `.gemini/`, `.cursor/`, `.opencode/`, `.agents/`, `opencode.json`, `.codex/`); ubah sumbernya lalu `tempa sync`.
+- `crates/tempa-core/tests/fixtures/` changes only when a test needs new data.
+- Do not edit generated files (`CLAUDE.md`, `.claude/`, `.gemini/`, `.cursor/`, `.opencode/`, `.agents/`, `.github/agents/`, `.github/skills/`, `.github/mcp.json`, `opencode.json`, `.codex/`); change the source, then `tempa sync`.

@@ -58,7 +58,7 @@ fn import_keeps_keys_of_existing_agent_configs() {
     import(d.path(), true).unwrap();
     let oc = read(d.path(), "opencode.json");
     assert!(
-        oc.contains("\"edit\": \"ask\"") && oc.contains("$schema") && oc.contains("\"mcp\""),
+        oc.contains("\"*\": \"ask\"") && oc.contains("$schema") && oc.contains("\"mcp\""),
         "{oc}"
     );
     let gm = read(d.path(), ".gemini/settings.json");
@@ -114,20 +114,21 @@ fn sync_fix_reports_lock_as_changed() {
 #[test]
 fn sync_fix_blocks_unstaged_source_changes() {
     let d = valid_repo();
-    write(
-        d.path(),
-        "AGENTS.md",
-        &format!("{}\nSECRET WIP NOTE\n", common::VALID_AGENTS),
-    );
+    let cmd = ".tempa/commands/review.md";
+    write(d.path(), cmd, "Review.\n");
+    tempa_core::sync::sync(d.path()).unwrap();
+    git(d.path(), &["add", "-A"]);
+    git(d.path(), &["commit", "-qm", "command", "--no-verify"]);
+    write(d.path(), cmd, "Review.\nSECRET WIP NOTE\n");
     let (changed, blockers) = sync_fix(d.path()).unwrap();
     assert!(changed.is_empty());
     assert!(
         blockers
             .iter()
-            .any(|f| f.code == "sync.unstaged_source" && f.path.as_deref() == Some("AGENTS.md")),
+            .any(|f| f.code == "sync.unstaged_source" && f.path.as_deref() == Some(cmd)),
         "{blockers:?}"
     );
-    assert!(!read(d.path(), ".cursor/rules/tempa.mdc").contains("SECRET WIP NOTE"));
+    assert!(!read(d.path(), ".claude/commands/review.md").contains("SECRET WIP NOTE"));
 }
 
 #[test]
@@ -424,4 +425,85 @@ fn init_refuses_repo_with_agent_context() {
         tempa_core::init::existing_agent_context(d.path()),
         Some("CLAUDE.md")
     );
+}
+
+// m4 review: servers in an existing .github/mcp.json are absorbed, not dropped on sync.
+#[test]
+fn import_absorbs_copilot_mcp_servers() {
+    let d = valid_repo();
+    let p = d.path();
+    write(
+        p,
+        ".github/mcp.json",
+        r#"{"mcpServers":{"gh":{"type":"http","url":"https://api.example/mcp","tools":["*"]}}}"#,
+    );
+    let r = tempa_core::import::import(p, true).unwrap();
+    assert!(r.gaps.iter().all(|g| !g.contains("gh")), "{:?}", r.gaps);
+    assert!(read(p, ".tempa/mcp.toml").contains("gh"));
+    let v: serde_json::Value = serde_json::from_str(&read(p, ".github/mcp.json")).unwrap();
+    assert_eq!(v["mcpServers"]["gh"]["url"], "https://api.example/mcp");
+    let v: serde_json::Value = serde_json::from_str(&read(p, ".mcp.json")).unwrap();
+    assert_eq!(v["mcpServers"]["gh"]["url"], "https://api.example/mcp");
+}
+
+// m4 review: Cursor's ${env:X} round-trips; its built-in variables are not env vars.
+#[test]
+fn cursor_mcp_variables_round_trip() {
+    let d = valid_repo();
+    let p = d.path();
+    write(
+        p,
+        ".cursor/mcp.json",
+        r#"{"mcpServers":{"pg":{"command":"npx","args":["${workspaceFolder}/db"],"env":{"DB":"${env:DB_URL}"}}}}"#,
+    );
+    tempa_core::import::import(p, true).unwrap();
+    let cursor: serde_json::Value = serde_json::from_str(&read(p, ".cursor/mcp.json")).unwrap();
+    assert_eq!(cursor["mcpServers"]["pg"]["env"]["DB"], "${env:DB_URL}");
+    assert_eq!(
+        cursor["mcpServers"]["pg"]["args"][0],
+        "${workspaceFolder}/db"
+    );
+    let claude: serde_json::Value = serde_json::from_str(&read(p, ".mcp.json")).unwrap();
+    assert_eq!(claude["mcpServers"]["pg"]["env"]["DB"], "${DB_URL}");
+    let opencode: serde_json::Value = serde_json::from_str(&read(p, "opencode.json")).unwrap();
+    assert_eq!(opencode["mcp"]["pg"]["environment"]["DB"], "{env:DB_URL}");
+}
+
+// m4 review: hand-written files in the new tempa-owned dirs are absorbed, not stuck as drift.
+#[test]
+fn import_absorbs_copilot_and_codex_agent_dirs() {
+    let d = valid_repo();
+    let p = d.path();
+    write(
+        p,
+        ".github/agents/rev.agent.md",
+        "---\nname: rev\ndescription: Reviews\n---\nReview it.\n",
+    );
+    write(
+        p,
+        ".codex/agents/sec.toml",
+        "name = \"sec\"\ndescription = \"Security: audits\"\ndeveloper_instructions = \"\"\"\nAudit it.\n\"\"\"\n",
+    );
+    let r = tempa_core::import::import(p, true).unwrap();
+    assert!(r.gaps.is_empty(), "{:?}", r.gaps);
+    assert!(read(p, ".tempa/agents/rev.md").contains("Review it."));
+    let sec = read(p, ".tempa/agents/sec.md");
+    assert_eq!(
+        sec,
+        "---\nname: sec\ndescription: \"Security: audits\"\n---\nAudit it.\n"
+    );
+    assert!(drift(p).unwrap().is_empty(), "{:?}", drift(p).unwrap());
+}
+
+// A skill in .github/skills is not absorbed (its target is .agents/skills); the
+// finding says where it goes.
+#[test]
+fn copilot_skill_dir_drift_names_the_skill_source() {
+    let d = valid_repo();
+    let p = d.path();
+    sync(p).unwrap();
+    write(p, ".github/skills/lint/SKILL.md", "Lint it.\n");
+    let f = drift_findings(&drift(p).unwrap());
+    assert_eq!(f.len(), 1, "{f:?}");
+    assert!(f[0].message.contains(".tempa/skills/"), "{}", f[0].message);
 }

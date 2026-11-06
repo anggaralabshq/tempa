@@ -121,7 +121,7 @@ pub fn sync_force(root: &Path) -> Result<Vec<String>> {
 }
 
 /// Target dirs `tempa import` can absorb new files from: (dir, `.tempa/<kind>`).
-pub const ITEM_DIRS: [(&str, &str); 8] = [
+pub const ITEM_DIRS: [(&str, &str); 11] = [
     (".claude/commands", "commands"),
     (".claude/agents", "agents"),
     (".claude/skills", "skills"),
@@ -129,14 +129,19 @@ pub const ITEM_DIRS: [(&str, &str); 8] = [
     (".opencode/commands", "commands"),
     (".opencode/agents", "agents"),
     (".cursor/commands", "commands"),
+    (".cursor/agents", "agents"),
     (".gemini/agents", "agents"),
+    (".github/agents", "agents"),
+    (".codex/agents", "agents"),
 ];
 
 /// Shared config targets whose non-tempa keys `tempa import` keeps as a base.
-pub const CONFIG_FILES: [&str; 6] = [
+pub const CONFIG_FILES: [&str; 8] = [
     ".claude/settings.json",
+    ".github/mcp.json",
     ".mcp.json",
     ".cursor/mcp.json",
+    ".cursor/cli.json",
     ".gemini/settings.json",
     "opencode.json",
     ".codex/config.toml",
@@ -144,10 +149,7 @@ pub const CONFIG_FILES: [&str; 6] = [
 
 /// Direct edits to this target can be absorbed by `tempa import`.
 pub fn absorbs_edit(path: &str) -> bool {
-    path == "CLAUDE.md"
-        || path == ".cursor/rules/tempa.mdc"
-        || path.starts_with(".claude/")
-        || CONFIG_FILES.contains(&path)
+    path == "CLAUDE.md" || path.starts_with(".claude/") || CONFIG_FILES.contains(&path)
 }
 
 /// A new file at this path can be absorbed by `tempa import`.
@@ -243,6 +245,11 @@ pub fn drift_findings(d: &[Drift]) -> Vec<Finding> {
                 "drift.untracked",
                 Some(p.clone()),
                 "new file in a tempa-owned directory; run tempa import --yes to absorb",
+            ),
+            Drift::Untracked(p) if p.starts_with(".github/skills/") => Finding::error(
+                "drift.untracked",
+                Some(p.clone()),
+                "new file in a tempa-owned directory; move the skill to .tempa/skills/<name>/ (tempa writes skills to .agents/skills/, which Copilot reads), then delete this file",
             ),
             Drift::Untracked(p) => Finding::error(
                 "drift.untracked",

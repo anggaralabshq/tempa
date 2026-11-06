@@ -121,7 +121,7 @@ fn doctor_lifecycle_mcp() {
     assert!(r.rows.iter().all(|row| row.lifecycle == "mcp"));
     set_serve(p, false);
     let r = tempa_core::doctor::doctor(p).unwrap();
-    assert!(r.rows.iter().all(|row| row.lifecycle == "M3"));
+    assert!(r.rows.iter().all(|row| row.lifecycle == "off"));
 }
 
 #[test]

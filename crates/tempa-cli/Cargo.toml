@@ -4,13 +4,18 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "One contract (AGENTS.md + .tempa/) kept in sync with Claude Code, Codex, Gemini CLI, OpenCode, Cursor and GitHub Copilot"
+readme = "../../README.md"
 
 [[bin]]
 name = "tempa"
 path = "src/main.rs"
 
 [dependencies]
-tempa-core = { path = "../tempa-core" }
+tempa-core = { path = "../tempa-core", version = "0.1.0" }
 clap = { version = "4", features = ["derive"] }
 
 [dev-dependencies]

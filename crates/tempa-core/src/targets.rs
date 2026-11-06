@@ -39,10 +39,12 @@ pub struct Rendered {
 pub fn managed_dirs(agent: Agent) -> &'static [&'static str] {
     match agent {
         Agent::Claude => &[".claude/commands", ".claude/agents", ".claude/skills"],
-        Agent::Codex => &[".agents/skills"],
+        Agent::Codex => &[".codex/agents", ".agents/skills"],
         Agent::Gemini => &[".gemini/commands", ".gemini/agents", ".agents/skills"],
         Agent::Opencode => &[".opencode/commands", ".opencode/agents", ".agents/skills"],
-        Agent::Cursor => &[".cursor/commands", ".agents/skills"],
+        Agent::Cursor => &[".cursor/commands", ".cursor/agents", ".agents/skills"],
+        // Never `.github` itself: it holds workflows and other repo files.
+        Agent::Copilot => &[".github/agents", ".github/skills", ".agents/skills"],
     }
 }
 
@@ -77,7 +79,7 @@ fn with_header(front_raw: Option<&str>, body: &str) -> String {
 }
 
 /// Frontmatter built from chosen pairs only.
-fn front_of(pairs: &[(&str, &str)]) -> String {
+pub(crate) fn front_of(pairs: &[(&str, &str)]) -> String {
     pairs
         .iter()
         .map(|(k, v)| format!("{k}: {}\n", yaml_scalar(v)))
@@ -103,17 +105,103 @@ fn yaml_scalar(v: &str) -> String {
     }
 }
 
-/// `${VAR}` (Claude/Cursor/Gemini syntax) → OpenCode `{env:VAR}`.
-fn opencode_env(v: &str) -> String {
+/// Rewrite each `${VAR}` (source syntax) with `f(VAR)`.
+fn env_refs(v: &str, f: impl Fn(&str) -> String) -> String {
     let mut out = String::new();
     let mut rest = v;
     while let Some(i) = rest.find("${") {
         let Some(j) = rest[i..].find('}') else { break };
         out.push_str(&rest[..i]);
-        out.push_str(&format!("{{env:{}}}", &rest[i + 2..i + j]));
+        out.push_str(&f(&rest[i + 2..i + j]));
         rest = &rest[i + j + 1..];
     }
     out + rest
+}
+
+/// `${VAR}` → OpenCode `{env:VAR}`.
+fn opencode_env(v: &str) -> String {
+    env_refs(v, |n| format!("{{env:{n}}}"))
+}
+
+/// Cursor's own variables (cursor.com/docs/context/mcp); everything else is an env var.
+const CURSOR_VARS: [&str; 5] = [
+    "workspaceFolder",
+    "workspaceFolderBasename",
+    "userHome",
+    "pathSeparator",
+    "/",
+];
+
+/// `${VAR}` → Cursor `${env:VAR}` (cursor.com/docs/context/mcp), in every string.
+fn cursor_env(v: &mut Value) {
+    match v {
+        Value::String(s) => {
+            *s = env_refs(s, |n| {
+                if n.starts_with("env:") || CURSOR_VARS.contains(&n) {
+                    format!("${{{n}}}")
+                } else {
+                    format!("${{env:{n}}}")
+                }
+            })
+        }
+        Value::Array(a) => a.iter_mut().for_each(cursor_env),
+        Value::Object(m) => m.values_mut().for_each(cursor_env),
+        _ => {}
+    }
+}
+
+/// Subagent with `name` (default: file stem) and `description` frontmatter.
+fn named_agent(a: &Item) -> String {
+    let name = front_get(a, "name").unwrap_or_else(|| stem(&a.rel));
+    let mut pairs = vec![("name", name)];
+    if let Some(d) = front_get(a, "description") {
+        pairs.push(("description", d));
+    }
+    with_header(Some(&front_of(&pairs)), &a.body)
+}
+
+/// opencode.ai/docs/permissions: `permission.edit` maps globs to allow/ask/deny, the last
+/// match wins, so `*` (the user's default) stays first. False when `permission` is not an
+/// object (a string applies to every tool; left as the user wrote it).
+fn opencode_deny(v: &mut Map<String, Value>, cfg: &Config) -> bool {
+    let perm = v.entry("permission").or_insert_with(|| json!({}));
+    let Some(perm) = perm.as_object_mut() else {
+        return false;
+    };
+    let mut edit = match perm.remove("edit") {
+        Some(Value::Object(m)) => m,
+        Some(Value::String(s)) => Map::from_iter([("*".to_string(), json!(s))]),
+        _ => Map::from_iter([("*".to_string(), json!("allow"))]),
+    };
+    // ponytail: serde_json sorts keys; `*` sorts before any glob starting with a letter, `.` or `/`.
+    for p in &cfg.gates.protected_paths {
+        edit.insert(
+            p.trim_start_matches("./").trim_start_matches('/').into(),
+            json!("deny"),
+        );
+    }
+    perm.insert("edit".into(), Value::Object(edit));
+    true
+}
+
+/// Append one deny rule per protected path to `v.permissions.deny`, keeping what is there.
+fn merge_deny(v: &mut Map<String, Value>, cfg: &Config, rule: impl Fn(&str) -> String) {
+    let perms = v.entry("permissions").or_insert_with(|| json!({}));
+    if !perms.is_object() {
+        *perms = json!({});
+    }
+    let perms = perms.as_object_mut().expect("object");
+    let mut deny: Vec<Value> = perms
+        .get("deny")
+        .and_then(|d| d.as_array().cloned())
+        .unwrap_or_default();
+    for p in &cfg.gates.protected_paths {
+        let r = json!(rule(p.trim_start_matches("./").trim_start_matches('/')));
+        if !deny.contains(&r) {
+            deny.push(r);
+        }
+    }
+    perms.insert("deny".into(), Value::Array(deny));
 }
 
 fn opencode_map(m: &std::collections::BTreeMap<String, String>) -> Value {
@@ -128,9 +216,29 @@ fn item_raw(item: &Item) -> String {
     with_header(item.front.as_ref().map(|f| f.raw.as_str()), &item.body)
 }
 
+/// Flat file name for agents that keep one directory level: `backend/reviewer.md` →
+/// `backend-reviewer`, so agents in different subfolders do not overwrite each other.
+fn flat_stem(rel: &str) -> String {
+    rel.strip_suffix(".md").unwrap_or(rel).replace('/', "-")
+}
+
 fn stem(rel: &str) -> &str {
     let name = rel.rsplit('/').next().unwrap_or(rel);
     name.strip_suffix(".md").unwrap_or(name)
+}
+
+/// Copilot skill name: lowercase letters, digits and hyphens (docs: must match the folder).
+fn skill_name(rel: &str) -> String {
+    let raw = rel.strip_suffix(".md").unwrap_or(rel).to_lowercase();
+    let mut out = String::new();
+    for ch in raw.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch);
+        } else if !out.ends_with('-') {
+            out.push('-');
+        }
+    }
+    out.trim_matches('-').to_string()
 }
 
 fn base_json(src: &Source, path: &str) -> Map<String, Value> {
@@ -221,7 +329,7 @@ fn deny_gaps(out: &mut Out, cfg: &Config) {
 }
 
 fn toml_basic(s: &str) -> String {
-    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+    toml_edit::Value::from(s).to_string().trim().to_string()
 }
 
 fn toml_multiline(s: &str) -> String {
@@ -411,29 +519,7 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
 
             let path = ".claude/settings.json";
             let mut v = base_json(src, path);
-            let perms = v.entry("permissions").or_insert_with(|| json!({}));
-            if !perms.is_object() {
-                *perms = json!({});
-            }
-            let perms = perms.as_object_mut().expect("object");
-            let mut deny: Vec<Value> = perms
-                .get("deny")
-                .and_then(|d| d.as_array().cloned())
-                .unwrap_or_default();
-            let seen: BTreeSet<String> = deny
-                .iter()
-                .filter_map(|d| d.as_str().map(String::from))
-                .collect();
-            for p in &cfg.gates.protected_paths {
-                let rule = format!(
-                    "Edit(/{})",
-                    p.trim_start_matches("./").trim_start_matches('/')
-                );
-                if !seen.contains(&rule) {
-                    deny.push(json!(rule));
-                }
-            }
-            perms.insert("deny".into(), Value::Array(deny));
+            merge_deny(&mut v, cfg, |p| format!("Edit(/{p})"));
             if inject {
                 // Claude Code asks before starting a project `.mcp.json` server unless listed here.
                 let list = v
@@ -461,8 +547,15 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
             for c in &src.commands {
                 o.gap("commands", &c.rel);
             }
+            // learn.chatgpt.com/docs/agent-configuration/subagents: one TOML file per agent.
             for a in &src.agents {
-                o.gap("agents", &a.rel);
+                let name = front_get(a, "name").unwrap_or_else(|| stem(&a.rel));
+                let mut t = header_toml() + "\n";
+                t += &format!("name = {}\n", toml_basic(name));
+                let d = front_get(a, "description").unwrap_or(name);
+                t += &format!("description = {}\n", toml_basic(d));
+                t += &format!("developer_instructions = {}\n", toml_multiline(&a.body));
+                o.file(format!(".codex/agents/{}.toml", flat_stem(&a.rel)), t);
             }
             skills(o, src, ".agents/skills");
             deny_gaps(o, cfg);
@@ -485,15 +578,7 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 o.file(format!(".gemini/commands/{rel}.toml"), t);
             }
             for a in &src.agents {
-                let name = front_get(a, "name").unwrap_or_else(|| stem(&a.rel));
-                let mut pairs = vec![("name", name)];
-                if let Some(d) = front_get(a, "description") {
-                    pairs.push(("description", d));
-                }
-                o.file(
-                    format!(".gemini/agents/{}", a.rel),
-                    with_header(Some(&front_of(&pairs)), &a.body),
-                );
+                o.file(format!(".gemini/agents/{}", a.rel), named_agent(a));
             }
             skills(o, src, ".agents/skills");
             deny_gaps(o, cfg);
@@ -529,11 +614,14 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 );
             }
             skills(o, src, ".agents/skills");
-            deny_gaps(o, cfg);
 
             let path = "opencode.json";
-            if !src.mcp.is_empty() || src.bases.contains_key(path) {
+            let deny = !cfg.gates.protected_paths.is_empty();
+            if !src.mcp.is_empty() || src.bases.contains_key(path) || deny {
                 let mut v = base_json(src, path);
+                if deny && !opencode_deny(&mut v, cfg) {
+                    deny_gaps(o, cfg);
+                }
                 // OpenCode adds this key itself when it runs; render it so that is not drift.
                 v.entry("$schema")
                     .or_insert_with(|| json!("https://opencode.ai/config.json"));
@@ -569,32 +657,104 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
             }
         }
         Agent::Cursor => {
-            let front = front_of(&[
-                ("description", "Project instructions (generated by tempa)"),
-                ("alwaysApply", "true"),
-            ]);
-            o.file(
-                ".cursor/rules/tempa.mdc",
-                with_header(Some(&front), &src.agents_md),
-            );
+            // Context: Cursor reads AGENTS.md itself (cursor.com/docs/rules).
             for c in &src.commands {
                 o.file(
                     format!(".cursor/commands/{}", c.rel),
                     with_header(None, &c.body),
                 );
             }
+            // Cursor also reads .claude/agents/ (cursor.com/docs/subagents). It reads
+            // .codex/agents/ only as markdown, and Codex writes TOML there.
+            if !cfg.agents.enabled.contains(&Agent::Claude) {
+                for a in &src.agents {
+                    o.file(format!(".cursor/agents/{}", a.rel), named_agent(a));
+                }
+            }
+            skills(o, src, ".agents/skills");
+
+            // cursor.com/docs/cli/reference/permissions: the CLI honours this; the IDE may not.
+            let path = ".cursor/cli.json";
+            let mut v = base_json(src, path);
+            merge_deny(&mut v, cfg, |p| format!("Write({p})"));
+            o.file(path, pretty(&v));
+
+            let path = ".cursor/mcp.json";
+            if !src.mcp.is_empty() || src.bases.contains_key(path) {
+                let mut v = base_json(src, path);
+                if !src.mcp.is_empty() {
+                    let mut servers = mcp_map(src, |u| json!({"type":"http","url":u}));
+                    cursor_env(&mut servers);
+                    v.insert("mcpServers".into(), servers);
+                }
+                o.file(path, pretty(&v));
+            }
+        }
+        Agent::Copilot => {
+            // Context: Copilot reads AGENTS.md itself (docs.github.com/en/copilot/reference/
+            // custom-instructions-support); a copilot-instructions.md would load it twice.
+            let mut taken: BTreeSet<String> =
+                src.skills.iter().map(|s| s.name.to_lowercase()).collect();
+            for c in &src.commands {
+                // Prompt files are not loaded by the Copilot harness or CLI; user-invoked skills are.
+                let name = skill_name(&c.rel);
+                if name.is_empty() {
+                    o.gap(
+                        "commands",
+                        &format!("{} (no ASCII letters for a Copilot skill name)", c.rel),
+                    );
+                    continue;
+                }
+                if !taken.insert(name.clone()) {
+                    o.gap(
+                        "commands",
+                        &format!("{} (a skill named {name} exists)", c.rel),
+                    );
+                    continue;
+                }
+                if (1..=9).any(|n| c.body.contains(&format!("${n}"))) {
+                    o.gap(
+                        "commands",
+                        &format!("{} ($1..$9 not supported by Copilot)", c.rel),
+                    );
+                }
+                let desc = front_get(c, "description").unwrap_or(&name);
+                let front = front_of(&[
+                    ("name", &name),
+                    ("description", desc),
+                    ("disable-model-invocation", "true"),
+                ]);
+                let body = c.body.replace("$ARGUMENTS", "(the text after the command)");
+                o.file(
+                    format!(".github/skills/{name}/SKILL.md"),
+                    with_header(Some(&front), &body),
+                );
+            }
             for a in &src.agents {
-                o.gap("agents", &a.rel);
+                o.file(
+                    format!(".github/agents/{}.agent.md", flat_stem(&a.rel)),
+                    named_agent(a),
+                );
             }
             skills(o, src, ".agents/skills");
             deny_gaps(o, cfg);
-            mcp_file(
-                o,
-                src,
-                ".cursor/mcp.json",
-                "mcpServers",
-                |u| json!({"type":"http","url":u}),
-            );
+
+            let path = ".github/mcp.json";
+            if !src.mcp.is_empty() || src.bases.contains_key(path) {
+                let mut v = base_json(src, path);
+                if !src.mcp.is_empty() {
+                    let mut servers = mcp_map(src, |u| json!({"type":"http","url":u}));
+                    for s in servers.as_object_mut().expect("object").values_mut() {
+                        s.as_object_mut()
+                            .expect("object")
+                            .entry("type")
+                            .or_insert_with(|| json!("local"));
+                        s["tools"] = json!(["*"]);
+                    }
+                    v.insert("mcpServers".into(), servers);
+                }
+                o.file(path, pretty(&v));
+            }
         }
     }
     out.r

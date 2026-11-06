@@ -1,133 +1,106 @@
 # Changes
 
-## 2026-11-06 · 20261106-adopsi-tempa
-- Ringkasan: Dogfooding tempa di repo sendiri
-- Alasan: Pilot M1: membuktikan kontrak terbaca agent asli dan alur hook berjalan
-- Decision: -
-- Harness: lulus
+## 2026-11-06 · 20261106-english-vocabulary
+- Summary: English default contract vocabulary with legacy Indonesian aliases
+- Reason: CLI is going public; all other user-facing text is English
+- Decision: docs/decisions/2026-11-06-english-default-vocabulary.md
+- Harness: pass
 - Agent: claude-code / claude-opus-5-5
 
-## 2026-11-06 · 20261106-backlog-pilot-minor
-- Ringkasan: Temuan pilot dan minor M1 ditutup
-- Alasan: Pilot dogfooding menemukan bug pr-body dan default yang terikat Bitbucket; minor review akhir ditunda dari M1
-- Decision: -
-- Harness: lulus
-- Agent: claude-code / claude-opus-5-5
-
-## 2026-11-06 · 20261106-english-messages
-- Ringkasan: English for user-facing text
-- Alasan: Repo and tool are published in English
+## 2026-11-06 · 20261106-english-docs
+- Summary: Move this repo's contract and docs to English
+- Reason: English is the default vocabulary and the repo is going public
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
 
-## 2026-11-06 · 20261106-mcp-protocol
-- Ringkasan: tempa mcp server: protocol core and read tools
-- Alasan: Agents need the contract over MCP (M3-lite, part 1 of 3)
-- Decision: docs/decisions/2026-11-06-mcp-server-on-serde-json.md
-- Harness: pass
-- Agent: claude-code / claude-opus-5-5
-
-## 2026-11-06 · 20261106-mcp-write-tools
-- Ringkasan: tempa mcp write tools: plan, decision, changes entry
-- Alasan: Uniform workflow documents from every agent (M3-lite, part 2 of 3)
-- Decision: docs/decisions/2026-11-06-mcp-server-on-serde-json.md
-- Harness: pass
-- Agent: claude-code / claude-opus-5-5
-
-## 2026-11-06 · 20261106-m3-lite-mcp
-- Ringkasan: Register the tempa MCP server in every agent config
-- Alasan: Every agent starts tempa mcp itself (M3-lite, part 3 of 3)
-- Decision: docs/decisions/2026-11-06-mcp-server-on-serde-json.md
-- Harness: pass
-- Agent: claude-code / claude-opus-5-5
-
-## 2026-11-06 · 20261106-lockfiles-not-counted
-- Ringkasan: Lockfiles do not count toward the diff gate
-- Alasan: Generated, not reviewed; the M2 app scaffold would fail the gate on lockfiles alone
+## 2026-11-06 · 20261106-public-readiness
+- Summary: Add CONTRIBUTING, SECURITY and README positioning
+- Reason: Public readiness before the first release
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
 
-## 2026-11-06 · 20261106-app-scaffold
-- Ringkasan: Desktop app scaffold (Tauri 2, React, Bun)
-- Alasan: M2 shell: separate workspace so the CLI never builds Tauri
+## 2026-11-06 · 20261106-desktop-app-branch
+- Summary: Move the frozen desktop app to branch desktop-app; CI for the CLI
+- Reason: main becomes a CLI-only repo
+- Decision: docs/decisions/2026-11-06-desktop-app-to-branch.md
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-fix-homebrew-checksums
+- Summary: Homebrew formula reads the uploaded .sha256 names and fails on bad checksums
+- Reason: Review: the first release would have pushed a formula with empty sha256 values
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
 
-## 2026-11-06 · 20261106-app-terminal
-- Ringkasan: Terminal: pty per pane with the login-shell PATH
-- Alasan: M2: agents run in the app's terminal and must find tempa, claude, codex
-- Decision: docs/decisions/2026-11-06-desktop-stack-tauri.md
-- Harness: pass
-- Agent: claude-code / claude-opus-5-5
-
-## 2026-11-06 · 20261106-app-tabs-panes
-- Ringkasan: Tabs and split panes
-- Alasan: M2: several agents and shells side by side per project
+## 2026-11-06 · 20261106-harness-git-env
+- Summary: Harness commands no longer inherit the hook's GIT_DIR and related variables
+- Reason: Pushing from a worktree let the test suite's temp-repo git calls write into the pushing repo (bare flag, user config, branch commit)
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
 
-## 2026-11-06 · 20261106-app-projects
-- Ringkasan: Projects: add, remove, switch without losing terminals
-- Alasan: M2: one window for several repos
-- Decision: docs/decisions/2026-11-06-folder-picker-dialog-plugin.md
-- Harness: pass
-- Agent: claude-code / claude-opus-5-5
-## 2026-11-06 · 20261106-app-harness-ci
-- Ringkasan: App checks in the harness; Windows backend tests in CI
-- Alasan: Owner decision: one gate for CLI and app; Windows must work in M2
+## 2026-11-06 · 20261106-review-fixes-small
+- Summary: Fix small m4 review findings (TOML escaping, Codex description, Cursor agents, task base, pr-body base)
+- Reason: Fresh review of m4 before the milestone merge
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
 
-## 2026-11-06 · 20261106-app-contract-panel
-- Ringkasan: Contract panel: findings, drift actions, agents, hooks, CLI version
-- Alasan: M2: keep the contract visible and fixable without the CLI
+## 2026-11-06 · 20261106-mcp-import-fixes
+- Summary: Import absorbs .github/mcp.json servers; Cursor MCP variables round-trip
+- Reason: m4 review: user MCP servers could be dropped or broken by sync
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
 
-## 2026-11-06 · 20261106-app-watcher
-- Ringkasan: Watcher: source edits sync automatically, drift shows as a sidebar badge
-- Alasan: M2: keep agent files in sync without remembering to run tempa sync
-- Decision: docs/decisions/2026-11-06-watcher-on-notify.md
-- Harness: pass
-- Agent: claude-code / claude-opus-5-5
-
-## 2026-11-06 · 20261106-m2-review-fixes
-- Ringkasan: M2 review fixes: safe destructive actions, missing folders, Windows consoles, watcher and paste stalls
-- Alasan: Important findings from the fresh M2 final review
-- Decision: docs/decisions/2026-11-06-core-command-and-absorbed.md
-- Harness: pass
-- Agent: claude-code / claude-opus-5-5
-
-## 2026-11-06 · 20261106-m3-host-mcp-verify
-- Ringkasan: Host MCP mode in the app binary; Verify recorded by the host moves the task state
-- Alasan: M3: harness results must come from the host, not the agent
-- Decision: docs/decisions/2026-11-06-host-mcp-in-app-binary.md
-- Harness: pass
-- Agent: claude-code / claude-opus-5-5
-
-## 2026-11-06 · 20261106-m3-acp-client
-- Ringkasan: ACP client: agent process, JSON-RPC both ways, session with the tempa MCP server
-- Alasan: M3: run the five agents over ACP inside the lifecycle
-- Decision: docs/decisions/2026-11-06-acp-client-on-serde-json.md
-- Harness: pass
-- Agent: claude-code / claude-opus-5-5
-
-## 2026-11-06 · 20261106-fix-hookless-test-repos
-- Ringkasan: Test repos commit without hooks, so app tests pass without the tempa CLI (Windows CI)
-- Alasan: PR #16 and #17 were merged with red Windows CI
+## 2026-11-06 · 20261106-absorb-new-agent-dirs
+- Summary: Import absorbs hand-written Copilot and Codex agents; clear advice for .github/skills
+- Reason: m4 review: files in the new tempa-owned dirs failed tempa check with no way out
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
 
-## 2026-11-06 · 20261106-m3-agents-chat
-- Ringkasan: Agent table and chat sessions for the UI (start, prompt, cancel, stop, model, permissions)
-- Alasan: M3: run the five agents from the app
+## 2026-11-06 · 20261106-name-collisions
+- Summary: Report agent and Copilot skill name collisions instead of dropping items
+- Reason: m4 review: same-named items in subfolders silently overwrote each other
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-archive-old-docs
+- Summary: Archive internal and Indonesian docs; English decision headings
+- Reason: Public repo shows the docs a reader needs; history keeps the rest
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-readme-demo
+- Summary: README demo GIF (vhs tape) and aligned doctor table
+- Reason: Public readiness: show the product on the first screen
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-ci-portability
+- Summary: Make e2e, harness tests and CI portable across Linux, macOS and Windows
+- Reason: First milestone CI run failed: e2e on master-default runners, sh-only harness tests on Windows
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-windows-clippy
+- Summary: Unix-only harness env test compiles away on Windows
+- Reason: Milestone CI: unused imports failed clippy on Windows
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-lf-checkout
+- Summary: Force LF checkouts so templates and fixtures match on Windows
+- Reason: Milestone CI: autocrlf checkouts produced CRLF plan templates and fixtures
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5

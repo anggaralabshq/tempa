@@ -288,6 +288,38 @@ fn copy_in(root: &Path, from: &str, to: &str, plan: &mut Plan) -> Result<()> {
     Ok(())
 }
 
+/// A hand-written `.codex/agents/<x>.toml` as a markdown subagent (name, description,
+/// developer_instructions → frontmatter and body).
+fn codex_agent_in(root: &Path, from: &str, to: &str, plan: &mut Plan) -> Result<()> {
+    let text = std::fs::read_to_string(root.join(from))?;
+    let t = text.parse::<toml::Table>().ok();
+    let get = |k: &str| {
+        t.as_ref()
+            .and_then(|t| t.get(k)?.as_str().map(String::from))
+    };
+    let Some(body) = get("developer_instructions") else {
+        plan.report
+            .gaps
+            .push(format!("{from}: no developer_instructions, not absorbed"));
+        return Ok(());
+    };
+    let stem = to.rsplit('/').next().unwrap_or(to).trim_end_matches(".md");
+    let name = get("name").unwrap_or_else(|| stem.to_string());
+    let mut pairs = vec![("name", name.as_str())];
+    let desc = get("description");
+    if let Some(d) = &desc {
+        pairs.push(("description", d));
+    }
+    let md = format!("---\n{}---\n{body}", crate::targets::front_of(&pairs));
+    match std::fs::read(root.join(to)) {
+        Ok(existing) if hash(&existing) != hash(md.as_bytes()) => plan.report.gaps.push(format!(
+            "{to} already exists with content different from {from}; not overwritten"
+        )),
+        _ => plan.put(root, from, to, md.into_bytes()),
+    }
+    Ok(())
+}
+
 /// `.claude/*` is absorbed fully (new and edited); other agents' dirs only for new
 /// files, since their generated form drops fields the source keeps.
 fn copy_items(root: &Path, plan: &mut Plan) -> Result<()> {
@@ -304,8 +336,20 @@ fn copy_items(root: &Path, plan: &mut Plan) -> Result<()> {
                 continue;
             }
             let known = plan.lock.files.contains_key(&from) || plan.rendered.contains_key(&from);
-            if dir.starts_with(".claude/") || !known {
-                copy_in(root, &from, &format!("{TEMPA_DIR}/{kind}/{rel}"), plan)?;
+            // Copilot names agents `<x>.agent.md`; Codex agents are TOML.
+            let rel = match dir {
+                ".github/agents" => rel.strip_suffix(".agent.md").map(|s| format!("{s}.md")),
+                ".codex/agents" => rel.strip_suffix(".toml").map(|s| format!("{s}.md")),
+                _ => None,
+            }
+            .unwrap_or(rel);
+            let to = format!("{TEMPA_DIR}/{kind}/{rel}");
+            if dir == ".codex/agents" {
+                if !known {
+                    codex_agent_in(root, &from, &to, plan)?;
+                }
+            } else if dir.starts_with(".claude/") || !known {
+                copy_in(root, &from, &to, plan)?;
             }
         }
     }
@@ -315,7 +359,9 @@ fn copy_items(root: &Path, plan: &mut Plan) -> Result<()> {
 /// The MCP key each shared config file carries (owned by `.tempa/mcp.toml`).
 fn mcp_key(path: &str) -> Option<&'static str> {
     match path {
-        ".mcp.json" | ".cursor/mcp.json" | ".gemini/settings.json" => Some("mcpServers"),
+        ".mcp.json" | ".cursor/mcp.json" | ".gemini/settings.json" | ".github/mcp.json" => {
+            Some("mcpServers")
+        }
         "opencode.json" => Some("mcp"),
         ".codex/config.toml" => Some("mcp_servers"),
         _ => None,
@@ -506,11 +552,22 @@ fn mcp_server(from: &str, name: &str, v: &Value, gaps: &mut Vec<String>) -> McpS
         s.env = str_map(&v["env"]);
         s.headers = str_map(&v["headers"]);
     }
-    s.url = v["url"]
-        .as_str()
-        .or(v["httpUrl"].as_str())
-        .map(String::from);
-    const KNOWN: [&str; 8] = [
+    if from == ".cursor/mcp.json" {
+        // Cursor `${env:VAR}` → `${VAR}` (the source keeps Claude's syntax).
+        let un = |x: &str| x.replace("${env:", "${");
+        s.command = s.command.as_deref().map(un);
+        s.args = s.args.iter().map(|a| un(a)).collect();
+        s.env.values_mut().for_each(|v| *v = un(v));
+        s.headers.values_mut().for_each(|v| *v = un(v));
+    }
+    s.url = v["url"].as_str().or(v["httpUrl"].as_str()).map(|u| {
+        if from == ".cursor/mcp.json" {
+            u.replace("${env:", "${")
+        } else {
+            u.into()
+        }
+    });
+    const KNOWN: [&str; 9] = [
         "command",
         "args",
         "env",
@@ -519,9 +576,13 @@ fn mcp_server(from: &str, name: &str, v: &Value, gaps: &mut Vec<String>) -> McpS
         "httpUrl",
         "headers",
         "type",
+        "tools",
     ];
     for (k, x) in v.as_object().into_iter().flatten() {
-        let ok = KNOWN.contains(&k.as_str()) && !(k == "type" && x.as_str() == Some("sse"));
+        // Copilot's `tools: ["*"]` (all tools) is what every other agent does anyway.
+        let ok = KNOWN.contains(&k.as_str())
+            && !(k == "type" && x.as_str() == Some("sse"))
+            && !(k == "tools" && *x != serde_json::json!(["*"]));
         if !ok {
             gaps.push(format!(
                 "mcp {name} ({from}): field {k} is not carried to other agents"
@@ -574,6 +635,7 @@ fn mcp(root: &Path, plan: &mut Plan) -> Result<()> {
         ".mcp.json",
         ".cursor/mcp.json",
         ".gemini/settings.json",
+        ".github/mcp.json",
         "opencode.json",
         ".codex/config.toml",
     ] {

@@ -1,0 +1,86 @@
+# Runs only on a version tag (v1.2.3): build binaries, attach them with checksums to a
+# GitHub Release, then publish to crates.io and the Homebrew tap when their secrets exist.
+# Steps for the maintainer: docs/releasing.md.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+# Third-party actions are pinned to commit SHAs (tag in the comment): this workflow
+# holds publish tokens. Secrets live in the one step that needs them.
+permissions:
+  contents: read
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: taiki-e/create-gh-release-action@045e5c0ed9c50cc1f96de7e891a09ad3daea245f # v1.12.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  binaries:
+    needs: create-release
+    strategy:
+      matrix:
+        include:
+          - { target: aarch64-apple-darwin, os: macos-latest }
+          - { target: x86_64-apple-darwin, os: macos-latest }
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-latest }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest }
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1.30.2
+        with:
+          bin: tempa
+          target: ${{ matrix.target }}
+          archive: tempa-$tag-$target
+          include: LICENSE-MIT,LICENSE-APACHE,README.md
+          checksum: sha256
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  crates-io:
+    needs: binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - name: Publish tempa-core, then tempa-cli
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          if [ -z "$CARGO_REGISTRY_TOKEN" ]; then echo "CARGO_REGISTRY_TOKEN not set; skipping"; exit 0; fi
+          cargo publish -p tempa-core --locked
+          cargo publish -p tempa-cli --locked
+
+  homebrew:
+    needs: binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Update the formula in anggaralabshq/homebrew-tap
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then echo "HOMEBREW_TAP_TOKEN not set; skipping"; exit 0; fi
+          mkdir dist && cd dist
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern '*.sha256'
+          cd ..
+          git clone "https://x-access-token:${TAP_TOKEN}@github.com/anggaralabshq/homebrew-tap.git" tap
+          mkdir -p tap/Formula
+          scripts/homebrew-formula.sh "$GITHUB_REF_NAME" dist > tap/Formula/tempa.rb
+          cd tap
+          git config user.name "tempa release"
+          git config user.email "actions@users.noreply.github.com"
+          git add Formula/tempa.rb
+          git commit -m "tempa ${GITHUB_REF_NAME}"
+          git push

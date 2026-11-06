@@ -14,15 +14,17 @@ pub enum Agent {
     Gemini,
     Opencode,
     Cursor,
+    Copilot,
 }
 
 impl Agent {
-    pub const ALL: [Agent; 5] = [
+    pub const ALL: [Agent; 6] = [
         Agent::Claude,
         Agent::Codex,
         Agent::Gemini,
         Agent::Opencode,
         Agent::Cursor,
+        Agent::Copilot,
     ];
 
     pub fn name(&self) -> &'static str {
@@ -32,6 +34,7 @@ impl Agent {
             Agent::Gemini => "gemini",
             Agent::Opencode => "opencode",
             Agent::Cursor => "cursor",
+            Agent::Copilot => "copilot",
         }
     }
 }
@@ -81,16 +84,16 @@ fn strings(xs: &[&str]) -> Vec<String> {
 impl Default for Headings {
     fn default() -> Self {
         Headings {
-            context: strings(&["Stack", "Perintah", "Konvensi", "Area terlarang"]),
-            plan: strings(&["Tujuan", "Langkah", "File yang disentuh", "Risiko"]),
+            context: strings(&["Stack", "Commands", "Conventions", "Off-limits"]),
+            plan: strings(&["Goal", "Steps", "Files touched", "Risks"]),
             decisions: strings(&[
-                "Konteks",
-                "Opsi",
-                "Keputusan",
-                "Konsekuensi",
+                "Context",
+                "Options",
+                "Decision",
+                "Consequences",
                 "Agent + model",
             ]),
-            harness: strings(&["Definisi selesai", "Gate yang berlaku"]),
+            harness: strings(&["Definition of done", "Gates"]),
         }
     }
 }
@@ -248,7 +251,7 @@ changes   = "CHANGES.md"
 harness   = "HARNESS.md"
 
 [agents]
-enabled = ["claude", "codex", "gemini", "opencode", "cursor"]
+enabled = ["claude", "codex", "gemini", "opencode", "cursor", "copilot"]
 
 [harness]         # run in order; every command must exit 0
 # format    = "bun run format:check"

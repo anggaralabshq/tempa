@@ -293,3 +293,59 @@ fn sync_fix_stages_lock() {
         "ada yang belum di-stage:\n{status}"
     );
 }
+
+#[test]
+fn mcp_stdio_roundtrip() {
+    use std::io::{BufRead, BufReader, Write};
+    use std::process::Stdio;
+    let d = canon_repo();
+    git(d.path(), &["add", "-A"]);
+    git(d.path(), &["commit", "-qm", "init", "--no-verify"]);
+    let sub = d.path().join("src");
+    std::fs::create_dir_all(&sub).unwrap();
+    let mut child = Command::new(env!("CARGO_BIN_EXE_tempa"))
+        .current_dir(&sub)
+        .arg("mcp")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut stdin = child.stdin.take().unwrap();
+    let mut out = BufReader::new(child.stdout.take().unwrap());
+    let mut line = String::new();
+
+    writeln!(stdin, r#"{{"jsonrpc":"2.0","id":1,"method":"initialize","params":{{"protocolVersion":"2025-06-18","capabilities":{{}},"clientInfo":{{"name":"t","version":"0"}}}}}}"#).unwrap();
+    out.read_line(&mut line).unwrap();
+    let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(v["result"]["protocolVersion"], "2025-06-18");
+
+    writeln!(
+        stdin,
+        r#"{{"jsonrpc":"2.0","method":"notifications/initialized"}}"#
+    )
+    .unwrap();
+    writeln!(stdin, "not json").unwrap();
+    line.clear();
+    out.read_line(&mut line).unwrap();
+    let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(v["error"]["code"], -32700);
+
+    writeln!(stdin, r#"{{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{{"name":"tempa_status","arguments":{{}}}}}}"#).unwrap();
+    line.clear();
+    out.read_line(&mut line).unwrap();
+    let v: serde_json::Value = serde_json::from_str(&line).unwrap();
+    assert_eq!(v["id"], 2);
+    assert_eq!(v["result"]["isError"], false, "{v}");
+    let status: serde_json::Value =
+        serde_json::from_str(v["result"]["content"][0]["text"].as_str().unwrap()).unwrap();
+    assert_eq!(
+        status["branch"], "main",
+        "root must be the repo, not the subdir"
+    );
+
+    drop(stdin);
+    assert!(child.wait().unwrap().success());
+    let mut rest = String::new();
+    std::io::Read::read_to_string(&mut out, &mut rest).unwrap();
+    assert!(rest.is_empty(), "nothing else on stdout: {rest}");
+}

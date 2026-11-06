@@ -173,3 +173,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-codex-agents-opencode-deny
+- Ringkasan: Codex subagents in .codex/agents/*.toml; OpenCode denies protected edits via permission.edit
+- Alasan: m4 format verification: both now have an official project-level option
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

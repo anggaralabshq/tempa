@@ -125,3 +125,16 @@ fn workflow_commands() {
     let o = tempa(d.path(), &["pr-body"]);
     assert!(stdout(&o).contains("## Agent + model\n\ncodex / gpt-5"), "{}", stdout(&o));
 }
+
+#[test]
+fn init_prints_created_and_devops_handoff() {
+    let d = tempfile::tempdir().unwrap();
+    git(d.path(), &["init", "-q", "-b", "main"]);
+    let o = tempa(d.path(), &["init"]);
+    assert_eq!(o.status.code(), Some(0), "{}", stdout(&o));
+    let out = stdout(&o);
+    assert!(out.contains("tempa.toml") && out.contains(".tempa/hooks/pre-commit"), "{out}");
+    assert!(out.contains("Serahkan docs/tempa-devops.md ke tim DevOps."), "{out}");
+    assert_eq!(tempa(d.path(), &["sync", "--check"]).status.code(), Some(0), "init juga sync");
+    assert!(d.path().join("CLAUDE.md").is_file());
+}

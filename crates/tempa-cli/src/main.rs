@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::Path;
 use std::process::{Command, ExitCode};
-use tempa_core::{Finding, Severity, check, import, sync, task};
+use tempa_core::{Finding, Severity, check, import, init, sync, task};
 
 #[derive(Parser)]
 #[command(name = "tempa", version, about = "Satu kontrak konteks untuk semua coding agent")]
@@ -12,6 +12,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
+    /// Buat tempa.toml, dokumen kontrak, git hooks, dan dokumen serah-terima DevOps
+    Init,
     /// Generate file konteks tiap agent dari AGENTS.md dan .tempa/
     Sync {
         /// Hanya periksa drift, tidak menulis (untuk CI)
@@ -72,6 +74,9 @@ enum TaskCmd {
 }
 
 fn print_import(r: &import::ImportReport) {
+    for p in &r.initialized {
+        println!("created {p}");
+    }
     for p in &r.written {
         println!("ditulis: {p}");
     }
@@ -158,6 +163,16 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
         Cmd::Log { summary, reason, decision, harness, agent } => {
             task::log(root, &task::LogEntry { summary, reason, decision, harness, agent })?;
             println!("entri changes ditambahkan");
+            Ok(false)
+        }
+        Cmd::Init => {
+            for p in init::init(root)? {
+                println!("created {p}");
+            }
+            for p in sync::sync(root)? {
+                println!("synced {p}");
+            }
+            println!("Serahkan docs/tempa-devops.md ke tim DevOps.");
             Ok(false)
         }
         Cmd::PrBody => {

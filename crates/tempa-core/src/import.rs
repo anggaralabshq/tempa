@@ -19,12 +19,14 @@ pub struct ImportReport {
     pub harness_added: Vec<(String, String)>,
     pub protected_added: Vec<String>,
     pub gaps: Vec<String>,
+    /// Files created by `tempa init` because `tempa.toml` was missing (apply only).
+    pub initialized: Vec<String>,
 }
 
 /// Everything import would change, computed before touching disk.
 #[derive(Default)]
 struct Plan {
-    create_config: Option<String>,
+    create_config: bool,
     files: BTreeMap<String, Vec<u8>>,
     report: ImportReport,
 }
@@ -269,10 +271,8 @@ pub fn import(root: &Path, apply: bool) -> Result<ImportReport> {
     let cfg = match Config::load(root) {
         Ok(c) => c,
         Err(_) if !root.join(config::FILE).exists() => {
-            let text = config::default_toml(&project_name(root));
-            let c = Config::parse(&text)?;
-            plan.create_config = Some(text);
-            c
+            plan.create_config = true;
+            Config::parse(&config::default_toml(&project_name(root)))?
         }
         Err(e) => return Err(e),
     };
@@ -285,14 +285,14 @@ pub fn import(root: &Path, apply: bool) -> Result<ImportReport> {
 
     let mut report = plan.report;
     report.written = plan.files.keys().cloned().collect();
-    if plan.create_config.is_some() || !report.harness_added.is_empty() || !report.protected_added.is_empty() {
+    if plan.create_config || !report.harness_added.is_empty() || !report.protected_added.is_empty() {
         report.written.push(config::FILE.to_string());
     }
     report.written.sort();
 
     if apply {
-        if let Some(text) = &plan.create_config {
-            write_atomic(&root.join(config::FILE), text.as_bytes())?;
+        if plan.create_config {
+            report.initialized = crate::init::init(root)?;
         }
         for (path, bytes) in &plan.files {
             write_atomic(&root.join(path), bytes)?;

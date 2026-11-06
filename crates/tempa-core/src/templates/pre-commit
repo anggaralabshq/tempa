@@ -1,0 +1,3 @@
+#!/bin/sh
+# Dipasang tempa init: sync sumber -> target otomatis, blokir bila target diedit langsung.
+exec tempa sync --fix

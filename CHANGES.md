@@ -208,3 +208,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-pin-release-actions
+- Ringkasan: Release workflow: actions pinned to commit SHAs, per-job permissions, publish secrets scoped to their steps
+- Alasan: security review: the workflow holds publish tokens
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

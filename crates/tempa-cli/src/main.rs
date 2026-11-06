@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::Path;
 use std::process::{Command, ExitCode};
-use tempa_core::{Finding, Severity, check, import, init, sync, task};
+use tempa_core::{Finding, Severity, check, doctor, import, init, sync, task};
 
 #[derive(Parser)]
 #[command(name = "tempa", version, about = "Satu kontrak konteks untuk semua coding agent")]
@@ -14,6 +14,8 @@ struct Cli {
 enum Cmd {
     /// Buat tempa.toml, dokumen kontrak, git hooks, dan dokumen serah-terima DevOps
     Init,
+    /// Laporan paritas per agent (selalu exit 0)
+    Doctor,
     /// Generate file konteks tiap agent dari AGENTS.md dan .tempa/
     Sync {
         /// Hanya periksa drift, tidak menulis (untuk CI)
@@ -71,6 +73,23 @@ enum TaskCmd {
     New { slug: String },
     /// Tandai plan disetujui (panduan proses)
     Approve,
+}
+
+fn print_doctor(r: &doctor::DoctorReport) {
+    println!("{:<10} {:>5} {:>5}  {:<14} lifecycle", "agent", "files", "gaps", "protected");
+    for row in &r.rows {
+        println!("{:<10} {:>5} {:>5}  {:<14} {}", row.agent.name(), row.files, row.gaps.len(), row.protected, row.lifecycle);
+    }
+    for g in r.rows.iter().flat_map(|row| &row.gaps) {
+        println!("- {} {}: {} (disajikan lewat tempa_context mulai M3; ditegakkan CI)", g.agent.name(), g.kind, g.name);
+    }
+    for l in &r.legacy {
+        println!("legacy: {l} (boleh dihapus setelah dicek)");
+    }
+    if !r.hooks_ok {
+        println!("peringatan: git hooks belum terpasang; jalankan tempa init");
+    }
+    println!("drift: {}", r.drift);
 }
 
 fn print_import(r: &import::ImportReport) {
@@ -173,6 +192,10 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
                 println!("synced {p}");
             }
             println!("Serahkan docs/tempa-devops.md ke tim DevOps.");
+            Ok(false)
+        }
+        Cmd::Doctor => {
+            print_doctor(&doctor::doctor(root)?);
             Ok(false)
         }
         Cmd::PrBody => {

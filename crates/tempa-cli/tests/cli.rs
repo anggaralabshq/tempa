@@ -138,3 +138,17 @@ fn init_prints_created_and_devops_handoff() {
     assert_eq!(tempa(d.path(), &["sync", "--check"]).status.code(), Some(0), "init juga sync");
     assert!(d.path().join("CLAUDE.md").is_file());
 }
+
+#[test]
+fn doctor_prints_table_and_exits_0_even_with_drift() {
+    let d = canon_repo();
+    tempa(d.path(), &["sync"]);
+    write(d.path(), "CLAUDE.md", "edited\n");
+    let o = tempa(d.path(), &["doctor"]);
+    assert_eq!(o.status.code(), Some(0), "{}", stdout(&o));
+    let out = stdout(&o);
+    assert!(out.contains("agent") && out.contains("lifecycle"), "{out}");
+    assert!(out.contains("- codex commands: review.md (disajikan lewat tempa_context mulai M3; ditegakkan CI)"), "{out}");
+    assert!(out.contains("jalankan tempa init"), "{out}");
+    assert!(out.contains("drift: 1"), "{out}");
+}

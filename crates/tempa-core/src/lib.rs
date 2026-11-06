@@ -4,6 +4,7 @@ pub mod check;
 pub mod config;
 pub mod contract;
 pub mod date;
+pub mod doctor;
 pub mod gitx;
 pub mod import;
 pub mod init;

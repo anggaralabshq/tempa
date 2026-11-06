@@ -111,3 +111,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-readme-after-release
+- Summary: README install section after the v0.1.0 release
+- Reason: v0.1.0 is on Homebrew, crates.io and GitHub Releases
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

@@ -330,9 +330,7 @@ fn cursor_agents_only_when_claude_is_off() {
     let ru = render(Agent::Cursor, &c, &canon());
     assert!(!has(&ru, ".cursor/agents/tester.md"));
     assert!(ru.gaps.iter().all(|g| g.kind != "agents"));
-    c.agents
-        .enabled
-        .retain(|a| !matches!(a, Agent::Claude | Agent::Codex));
+    c.agents.enabled.retain(|a| !matches!(a, Agent::Claude));
     let ru = render(Agent::Cursor, &c, &canon());
     assert_eq!(
         text(&ru, ".cursor/agents/tester.md"),
@@ -385,13 +383,39 @@ fn codex_subagents_are_toml() {
 }
 
 #[test]
-fn cursor_agents_skip_when_codex_writes_them() {
+fn cursor_agents_written_when_only_codex_is_on() {
+    // Cursor reads .codex/agents/ only as markdown (cursor.com/docs/subagents); Codex writes TOML there.
     let mut c = cfg();
     c.agents.enabled = vec![Agent::Codex, Agent::Cursor];
-    assert!(!has(
+    assert!(has(
         &render(Agent::Cursor, &c, &canon()),
         ".cursor/agents/tester.md"
     ));
+}
+
+#[test]
+fn toml_descriptions_survive_newlines_and_missing_values() {
+    let mut src = canon();
+    src.agents = vec![
+        parse_item(
+            "multi.md".into(),
+            "---\ndescription: |\n  line one\n  line \"two\"\n---\nBody.\n",
+        ),
+        parse_item("bare.md".into(), "Body.\n"),
+    ];
+    src.commands = vec![parse_item(
+        "c.md".into(),
+        "---\ndescription: |\n  a\n  b\n---\nDo.\n",
+    )];
+    let r = render(Agent::Codex, &cfg(), &src);
+    let t: toml::Table = toml::from_str(&text(&r, ".codex/agents/multi.toml")).unwrap();
+    assert_eq!(t["description"].as_str(), Some("line one\nline \"two\""));
+    // Codex requires name, description and developer_instructions in every agent file.
+    let t: toml::Table = toml::from_str(&text(&r, ".codex/agents/bare.toml")).unwrap();
+    assert_eq!(t["description"].as_str(), Some("bare"));
+    let g = render(Agent::Gemini, &cfg(), &src);
+    let t: toml::Table = toml::from_str(&text(&g, ".gemini/commands/c.toml")).unwrap();
+    assert_eq!(t["description"].as_str(), Some("a\nb"));
 }
 
 #[test]

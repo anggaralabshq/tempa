@@ -90,3 +90,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-windows-clippy
+- Summary: Unix-only harness env test compiles away on Windows
+- Reason: Milestone CI: unused imports failed clippy on Windows
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

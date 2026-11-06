@@ -1,5 +1,8 @@
 //! tempa desktop shell: terminals per project and the contract panel, on tempa-core.
 
+// ponytail: wired into Tauri commands in the next PR (agents + chat); remove then.
+#[allow(dead_code)]
+mod acp;
 mod contract;
 mod env;
 mod mcp_host;

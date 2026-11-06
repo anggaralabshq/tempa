@@ -110,3 +110,10 @@
 - Decision: docs/decisions/2026-11-06-host-mcp-in-app-binary.md
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-m3-acp-client
+- Ringkasan: ACP client: agent process, JSON-RPC both ways, session with the tempa MCP server
+- Alasan: M3: run the five agents over ACP inside the lifecycle
+- Decision: docs/decisions/2026-11-06-acp-client-on-serde-json.md
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

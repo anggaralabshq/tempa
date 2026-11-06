@@ -120,3 +120,31 @@ fn import_on_bare_repo_runs_init() {
         "import content wins over the init template"
     );
 }
+
+#[test]
+fn install_hooks_does_not_touch_contract_files() {
+    let d = tempfile::tempdir().unwrap();
+    common::git_init(d.path());
+    assert!(tempa_core::init::install_hooks(d.path()).unwrap());
+    let mut files: Vec<String> = tempa_core::source::walk(d.path())
+        .unwrap()
+        .into_iter()
+        .map(|(rel, _)| rel)
+        .filter(|r| !r.starts_with(".git/"))
+        .collect();
+    files.sort();
+    assert_eq!(files, [".tempa/hooks/pre-commit", ".tempa/hooks/pre-push"]);
+    assert_eq!(
+        tempa_core::gitx::get_config(d.path(), "core.hooksPath").as_deref(),
+        Some(tempa_core::init::HOOKS_DIR)
+    );
+    // Another hook manager owns core.hooksPath: leave it.
+    let e = tempfile::tempdir().unwrap();
+    common::git_init(e.path());
+    tempa_core::gitx::set_config(e.path(), "core.hooksPath", ".husky").unwrap();
+    assert!(!tempa_core::init::install_hooks(e.path()).unwrap());
+    assert_eq!(
+        tempa_core::gitx::get_config(e.path(), "core.hooksPath").as_deref(),
+        Some(".husky")
+    );
+}

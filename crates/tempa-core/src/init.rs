@@ -58,8 +58,6 @@ pub fn init(root: &Path) -> Result<Vec<String>> {
         &format!("{}/.gitkeep", d.decisions.trim_end_matches('/')),
         "",
     )?;
-    create(&format!("{HOOKS_DIR}/pre-commit"), PRE_COMMIT)?;
-    create(&format!("{HOOKS_DIR}/pre-push"), PRE_PUSH)?;
     create(
         "docs/tempa-devops.md",
         &DEVOPS.replace("{version}", env!("CARGO_PKG_VERSION")),
@@ -81,20 +79,35 @@ pub fn init(root: &Path) -> Result<Vec<String>> {
         }
     }
 
-    #[cfg(unix)]
     for hook in ["pre-commit", "pre-push"] {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(
-            root.join(HOOKS_DIR).join(hook),
-            std::fs::Permissions::from_mode(0o755),
-        )?;
+        if !root.join(HOOKS_DIR).join(hook).exists() {
+            created.push(format!("{HOOKS_DIR}/{hook}"));
+        }
     }
+    install_hooks(root)?;
+    Ok(created)
+}
 
+/// Write `.tempa/hooks/{pre-commit,pre-push}` if missing and point `core.hooksPath` at
+/// them when it is unset. Touches nothing else. Returns whether `core.hooksPath` was set.
+pub fn install_hooks(root: &Path) -> Result<bool> {
+    for (hook, text) in [("pre-commit", PRE_COMMIT), ("pre-push", PRE_PUSH)] {
+        let p = root.join(HOOKS_DIR).join(hook);
+        if !p.exists() {
+            write_atomic(&p, text.as_bytes())?;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&p, std::fs::Permissions::from_mode(0o755))?;
+        }
+    }
     // Never replace another hook manager (husky, lefthook): the CLI warns instead.
     if gitx::is_repo(root) && gitx::get_config(root, "core.hooksPath").is_none() {
         gitx::set_config(root, "core.hooksPath", HOOKS_DIR)?;
+        return Ok(true);
     }
-    Ok(created)
+    Ok(false)
 }
 
 /// Agent context that `tempa import` should absorb instead of `tempa init`

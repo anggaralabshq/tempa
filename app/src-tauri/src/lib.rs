@@ -1,5 +1,6 @@
 //! tempa desktop shell: terminals per project and the contract panel, on tempa-core.
 
+mod contract;
 mod env;
 mod projects;
 mod pty;
@@ -87,6 +88,22 @@ fn projects_remove(app: tauri::AppHandle, id: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn contract_status(root: String) -> contract::ContractStatus {
+    let path = env::terminal_path().or_else(|| std::env::var("PATH").ok());
+    contract::status(std::path::Path::new(&root), path.as_deref())
+}
+
+#[tauri::command]
+async fn contract_preview(root: String, action: String) -> Result<Vec<String>, String> {
+    contract::preview(std::path::Path::new(&root), &action)
+}
+
+#[tauri::command]
+async fn contract_run(root: String, action: String) -> Result<Vec<String>, String> {
+    contract::run(std::path::Path::new(&root), &action)
+}
+
+#[tauri::command]
 fn pty_kill(ptys: State<'_, PtyManager>, id: u32) -> Result<(), String> {
     ptys.kill(id)
 }
@@ -103,7 +120,10 @@ pub fn run() {
             pty_kill,
             projects_list,
             projects_add,
-            projects_remove
+            projects_remove,
+            contract_status,
+            contract_preview,
+            contract_run
         ])
         .build(tauri::generate_context!())
         .expect("tempa app failed to start")

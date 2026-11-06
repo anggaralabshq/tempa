@@ -102,16 +102,15 @@ Upgrading a repo that already has its own `.mcp.json`, `.cursor/mcp.json`, `open
 
 Optional, and can come later. Local hooks can be skipped with `--no-verify`, so a CI step closes that gap. [`docs/tempa-devops.md`](crates/tempa-core/src/templates/devops.md) (written into your repo by `tempa init`) has ready-made Bitbucket Pipelines and GitHub Actions steps. Build the image with `docker build -t tempa:0.1.0 .`.
 
-## How tempa compares
+## Why tempa
 
-[rulesync](https://github.com/dyoshikawa/rulesync), [ruler](https://github.com/intellectronica/ruler), [ai-rulez](https://github.com/Goldziher/ai-rulez) and [APM](https://github.com/microsoft/apm) also generate agent files from one source, and cover far more agents (30 to 60+). If you need the widest coverage, use one of them.
+Your team's agent setup, reviewed like code.
 
-tempa covers six agents and goes further on keeping a team's committed configuration honest:
-
-- Direct edits to generated files are detected and absorbed back into the source, not overwritten.
-- `tempa check` gates the contract itself in CI: required headings, protected paths, harness commands, diff size, decision records for dependency changes.
-- `tempa doctor` reports, per agent, what it gets and what it cannot get (the gaps).
-- An optional task workflow (plan, decision, changes entry, pull request body) that is the same whichever agent did the work.
+- **Edit anywhere, lose nothing.** A direct edit to a generated file is detected, and `tempa import --yes` moves it back into the source instead of overwriting it.
+- **Honest about gaps.** `tempa doctor` shows, per agent, what it gets and what it cannot load natively, with the official docs behind every format in [docs/target-matrix.md](docs/target-matrix.md).
+- **Gaps still reach the agent.** Commands or subagents an agent cannot load natively are served by the `tempa` MCP server (`tempa_context`).
+- **Enforced in CI.** `tempa check` gates the contract itself: required headings, protected paths, harness commands, diff size, decision records for dependency changes.
+- **One workflow, any agent.** An optional task flow (plan, decision, changes entry, pull request body) that looks the same whichever agent did the work.
 
 ## Development
 

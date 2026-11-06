@@ -311,7 +311,7 @@ fn deny_gaps(out: &mut Out, cfg: &Config) {
 }
 
 fn toml_basic(s: &str) -> String {
-    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+    toml_edit::Value::from(s).to_string().trim().to_string()
 }
 
 fn toml_multiline(s: &str) -> String {
@@ -534,9 +534,8 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 let name = front_get(a, "name").unwrap_or_else(|| stem(&a.rel));
                 let mut t = header_toml() + "\n";
                 t += &format!("name = {}\n", toml_basic(name));
-                if let Some(d) = front_get(a, "description") {
-                    t += &format!("description = {}\n", toml_basic(d));
-                }
+                let d = front_get(a, "description").unwrap_or(name);
+                t += &format!("description = {}\n", toml_basic(d));
                 t += &format!("developer_instructions = {}\n", toml_multiline(&a.body));
                 let file = stem(&a.rel).replace('/', "-");
                 o.file(format!(".codex/agents/{file}.toml"), t);
@@ -648,13 +647,9 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                     with_header(None, &c.body),
                 );
             }
-            // Cursor also reads .claude/agents/ and .codex/agents/ (cursor.com/docs/subagents).
-            if !cfg
-                .agents
-                .enabled
-                .iter()
-                .any(|a| matches!(a, Agent::Claude | Agent::Codex))
-            {
+            // Cursor also reads .claude/agents/ (cursor.com/docs/subagents). It reads
+            // .codex/agents/ only as markdown, and Codex writes TOML there.
+            if !cfg.agents.enabled.contains(&Agent::Claude) {
                 for a in &src.agents {
                     o.file(format!(".cursor/agents/{}", a.rel), named_agent(a));
                 }

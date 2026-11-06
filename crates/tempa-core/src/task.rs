@@ -49,7 +49,7 @@ pub fn task_new(root: &Path, slug: &str) -> Result<String> {
     if root.join(&path).exists() {
         return Err(Error(format!("{path} already exists")));
     }
-    let from = gitx::current_branch(root).ok();
+    let from = gitx::current_branch(root).ok().filter(|b| b != "HEAD");
     gitx::switch_new(root, &format!("tempa/{id}"))?;
     if let Some(from) = from {
         gitx::set_task_base(root, &from)?;
@@ -219,7 +219,7 @@ pub fn pr_body(root: &Path) -> Result<String> {
     let harness = format!(
         "{} (recorded with `tempa log`). Re-verify: `tempa check --base {}`",
         field("Harness"),
-        cfg.ci.base
+        gitx::base_name(root, &cfg, None)
     );
     let or_dash = |v: Vec<String>| {
         if v.is_empty() {

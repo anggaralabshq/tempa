@@ -80,7 +80,7 @@ pub fn check(root: &Path, opts: &CheckOpts) -> Result<Vec<Finding>> {
     if base.is_none() {
         let msg = format!(
             "base branch {base_name} not found or history too shallow; task rules skipped. \
-             Di Bitbucket Pipelines pakai `clone: depth: full`"
+             On Bitbucket Pipelines use `clone: depth: full`"
         );
         f.push(
             if std::env::var("BITBUCKET_PR_ID").is_ok_and(|v| !v.is_empty()) {

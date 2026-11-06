@@ -315,7 +315,9 @@ fn copy_items(root: &Path, plan: &mut Plan) -> Result<()> {
 /// The MCP key each shared config file carries (owned by `.tempa/mcp.toml`).
 fn mcp_key(path: &str) -> Option<&'static str> {
     match path {
-        ".mcp.json" | ".cursor/mcp.json" | ".gemini/settings.json" => Some("mcpServers"),
+        ".mcp.json" | ".cursor/mcp.json" | ".gemini/settings.json" | ".github/mcp.json" => {
+            Some("mcpServers")
+        }
         "opencode.json" => Some("mcp"),
         ".codex/config.toml" => Some("mcp_servers"),
         _ => None,
@@ -506,11 +508,22 @@ fn mcp_server(from: &str, name: &str, v: &Value, gaps: &mut Vec<String>) -> McpS
         s.env = str_map(&v["env"]);
         s.headers = str_map(&v["headers"]);
     }
-    s.url = v["url"]
-        .as_str()
-        .or(v["httpUrl"].as_str())
-        .map(String::from);
-    const KNOWN: [&str; 8] = [
+    if from == ".cursor/mcp.json" {
+        // Cursor `${env:VAR}` → `${VAR}` (the source keeps Claude's syntax).
+        let un = |x: &str| x.replace("${env:", "${");
+        s.command = s.command.as_deref().map(un);
+        s.args = s.args.iter().map(|a| un(a)).collect();
+        s.env.values_mut().for_each(|v| *v = un(v));
+        s.headers.values_mut().for_each(|v| *v = un(v));
+    }
+    s.url = v["url"].as_str().or(v["httpUrl"].as_str()).map(|u| {
+        if from == ".cursor/mcp.json" {
+            u.replace("${env:", "${")
+        } else {
+            u.into()
+        }
+    });
+    const KNOWN: [&str; 9] = [
         "command",
         "args",
         "env",
@@ -519,9 +532,13 @@ fn mcp_server(from: &str, name: &str, v: &Value, gaps: &mut Vec<String>) -> McpS
         "httpUrl",
         "headers",
         "type",
+        "tools",
     ];
     for (k, x) in v.as_object().into_iter().flatten() {
-        let ok = KNOWN.contains(&k.as_str()) && !(k == "type" && x.as_str() == Some("sse"));
+        // Copilot's `tools: ["*"]` (all tools) is what every other agent does anyway.
+        let ok = KNOWN.contains(&k.as_str())
+            && !(k == "type" && x.as_str() == Some("sse"))
+            && !(k == "tools" && *x != serde_json::json!(["*"]));
         if !ok {
             gaps.push(format!(
                 "mcp {name} ({from}): field {k} is not carried to other agents"
@@ -574,6 +591,7 @@ fn mcp(root: &Path, plan: &mut Plan) -> Result<()> {
         ".mcp.json",
         ".cursor/mcp.json",
         ".gemini/settings.json",
+        ".github/mcp.json",
         "opencode.json",
         ".codex/config.toml",
     ] {

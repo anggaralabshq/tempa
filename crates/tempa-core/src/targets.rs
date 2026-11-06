@@ -123,13 +123,25 @@ fn opencode_env(v: &str) -> String {
     env_refs(v, |n| format!("{{env:{n}}}"))
 }
 
+/// Cursor's own variables (cursor.com/docs/context/mcp); everything else is an env var.
+const CURSOR_VARS: [&str; 5] = [
+    "workspaceFolder",
+    "workspaceFolderBasename",
+    "userHome",
+    "pathSeparator",
+    "/",
+];
+
 /// `${VAR}` → Cursor `${env:VAR}` (cursor.com/docs/context/mcp), in every string.
 fn cursor_env(v: &mut Value) {
     match v {
         Value::String(s) => {
-            *s = env_refs(s, |n| match n.strip_prefix("env:") {
-                Some(_) => format!("${{{n}}}"),
-                None => format!("${{env:{n}}}"),
+            *s = env_refs(s, |n| {
+                if n.starts_with("env:") || CURSOR_VARS.contains(&n) {
+                    format!("${{{n}}}")
+                } else {
+                    format!("${{env:{n}}}")
+                }
             })
         }
         Value::Array(a) => a.iter_mut().for_each(cursor_env),

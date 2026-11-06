@@ -1,7 +1,7 @@
 //! `tempa doctor`: per-agent parity report. A report, never a gate.
 
 use crate::config::{Agent, Config};
-use crate::targets::{Gap, render};
+use crate::targets::{Gap, TEMPA_SERVER, render};
 use crate::{Result, gitx, init::HOOKS_DIR, source, sync};
 use std::path::Path;
 
@@ -12,7 +12,7 @@ pub struct AgentRow {
     pub gaps: Vec<Gap>,
     /// "settings deny" | "gap (CI)"
     pub protected: &'static str,
-    /// Lifecycle hooks arrive with tempa_context in M3.
+    /// "mcp" when the agent gets the `tempa mcp` server, else "M3" (host lifecycle).
     pub lifecycle: &'static str,
 }
 
@@ -49,7 +49,11 @@ pub fn doctor(root: &Path) -> Result<DoctorReport> {
                 } else {
                     "gap (CI)"
                 },
-                lifecycle: "M3",
+                lifecycle: if cfg.mcp.serve || src.mcp.contains_key(TEMPA_SERVER) {
+                    "mcp"
+                } else {
+                    "M3"
+                },
             }
         })
         .collect();

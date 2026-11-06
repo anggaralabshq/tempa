@@ -21,7 +21,7 @@ fn doctor_after_import() {
         3
     );
     assert_eq!(codex.protected, "gap (CI)");
-    assert_eq!(codex.lifecycle, "M3");
+    assert_eq!(codex.lifecycle, "mcp");
     assert!(
         r.legacy.contains(&".cursorrules".to_string()),
         "{:?}",

@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "tempa": {
+      "args": [
+        "mcp"
+      ],
+      "command": "tempa"
+    }
+  }
+}

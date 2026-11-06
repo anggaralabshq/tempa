@@ -175,6 +175,8 @@ pub enum Drift {
     Untracked(String),
     /// Source changed, target not re-synced yet (`tempa sync`).
     Stale(String),
+    /// A file tempa would generate exists, but tempa never wrote it (not in the lock).
+    Foreign(String),
 }
 
 pub fn drift(root: &Path) -> Result<Vec<Drift>> {
@@ -190,6 +192,9 @@ pub fn drift(root: &Path) -> Result<Vec<Drift>> {
             Some(h) if h == want => {}
             Some(h) if lock.files.get(&f.path) == Some(&h) => {
                 out.push(Drift::Stale(f.path.clone()))
+            }
+            Some(_) if !lock.files.contains_key(&f.path) => {
+                out.push(Drift::Foreign(f.path.clone()))
             }
             Some(_) => out.push(Drift::Modified(f.path.clone())),
         }
@@ -244,6 +249,11 @@ pub fn drift_findings(d: &[Drift]) -> Vec<Finding> {
                 Some(p.clone()),
                 "new file in a tempa-owned directory; create its source in .tempa/commands/ (markdown), then delete this file",
             ),
+            Drift::Foreign(p) => Finding::error(
+                "drift.foreign",
+                Some(p.clone()),
+                "exists but was not written by tempa; run tempa import --yes to absorb it into .tempa/",
+            ),
             Drift::Missing(p) => Finding::error(
                 "drift.missing",
                 Some(p.clone()),
@@ -285,7 +295,12 @@ pub fn sync_fix(root: &Path) -> Result<(Vec<String>, Vec<Finding>)> {
     }
     let blockers: Vec<Drift> = drift(root)?
         .into_iter()
-        .filter(|d| matches!(d, Drift::Modified(_) | Drift::Untracked(_)))
+        .filter(|d| {
+            matches!(
+                d,
+                Drift::Modified(_) | Drift::Untracked(_) | Drift::Foreign(_)
+            )
+        })
         .collect();
     if !blockers.is_empty() {
         return Ok((vec![], drift_findings(&blockers)));

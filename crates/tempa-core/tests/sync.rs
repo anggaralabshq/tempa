@@ -140,13 +140,13 @@ fn fix_applies_stale_but_blocks_direct_edit() {
 }
 
 #[test]
-fn preexisting_handwritten_target_is_modified() {
+fn preexisting_handwritten_target_is_foreign() {
     let d = canon_repo();
     write(d.path(), "CLAUDE.md", "tulisan tangan\n");
     assert!(
         drift(d.path())
             .unwrap()
-            .contains(&Drift::Modified("CLAUDE.md".into()))
+            .contains(&Drift::Foreign("CLAUDE.md".into()))
     );
 }
 

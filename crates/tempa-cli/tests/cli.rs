@@ -190,7 +190,7 @@ fn workflow_commands() {
     assert!(
         std::fs::read_to_string(d.path().join("CHANGES.md"))
             .unwrap()
-            .contains("- Harness: belum")
+            .contains("- Harness: pending")
     );
     let o = tempa(
         d.path(),
@@ -227,7 +227,7 @@ fn init_prints_created_and_devops_handoff() {
         "{out}"
     );
     assert!(
-        out.contains("Serahkan docs/tempa-devops.md ke tim DevOps."),
+        out.contains("Hand docs/tempa-devops.md to whoever owns CI"),
         "{out}"
     );
     assert_eq!(
@@ -249,11 +249,11 @@ fn doctor_prints_table_and_exits_0_even_with_drift() {
     assert!(out.contains("agent") && out.contains("lifecycle"), "{out}");
     assert!(
         out.contains(
-            "- codex commands: review.md (disajikan lewat tempa_context mulai M3; ditegakkan CI)"
+            "- codex commands: review.md (served via tempa_context; enforced by tempa check)"
         ),
         "{out}"
     );
-    assert!(out.contains("jalankan tempa init"), "{out}");
+    assert!(out.contains("run tempa init"), "{out}");
     assert!(out.contains("drift: 1"), "{out}");
 }
 

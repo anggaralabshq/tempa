@@ -11,7 +11,7 @@ fn entry() -> LogEntry {
         summary: "s".into(),
         reason: "r".into(),
         decision: None,
-        harness: "lulus".into(),
+        harness: "pass".into(),
         agent: "codex / gpt-5".into(),
     }
 }
@@ -29,7 +29,7 @@ fn pr_body_lists_only_decision_docs_reports_harness_and_keeps_heading_levels() {
     assert!(body.contains(&format!("- {dec}")), "{body}");
     assert!(!body.contains(".gitkeep"), "{body}");
     assert!(!body.contains("Bitbucket"), "{body}");
-    assert!(body.contains("lulus"), "{body}");
+    assert!(body.contains("pass"), "{body}");
     let top: Vec<_> = sections(&body)
         .into_iter()
         .filter(|s| s.level == 2)
@@ -134,7 +134,7 @@ fn task_new_outside_git_says_so() {
     let d = tempfile::tempdir().unwrap();
     write(d.path(), "tempa.toml", &default_toml("x"));
     let e = task_new(d.path(), "x").unwrap_err().0;
-    assert!(e.contains("bukan repo git"), "{e}");
+    assert!(e.contains("not a git repository"), "{e}");
 }
 
 #[test]
@@ -142,7 +142,7 @@ fn unreadable_config_is_not_reported_as_missing() {
     let d = tempfile::tempdir().unwrap();
     std::fs::create_dir(d.path().join("tempa.toml")).unwrap(); // exists, unreadable as file
     let e = Config::load(d.path()).unwrap_err().0;
-    assert!(!e.contains("tidak ditemukan"), "{e}");
+    assert!(!e.contains("not found"), "{e}");
 }
 
 #[test]

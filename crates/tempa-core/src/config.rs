@@ -186,23 +186,19 @@ impl Config {
     pub fn load(root: &Path) -> Result<Config> {
         let path = root.join(FILE);
         let text = std::fs::read_to_string(&path).map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => {
-                Error(format!("{FILE} tidak ditemukan; jalankan `tempa init`"))
-            }
-            _ => Error(format!("{FILE} tidak bisa dibaca: {e}")),
+            std::io::ErrorKind::NotFound => Error(format!("{FILE} not found; run `tempa init`")),
+            _ => Error(format!("{FILE} could not be read: {e}")),
         })?;
         Self::parse(&text)
     }
 
     pub fn parse(text: &str) -> Result<Config> {
         let raw: Raw =
-            toml::from_str(text).map_err(|e| Error(format!("{FILE} tidak valid: {e}")))?;
+            toml::from_str(text).map_err(|e| Error(format!("{FILE} is invalid: {e}")))?;
         let mut harness = Vec::new();
         for (name, value) in raw.harness {
             let cmd = value.as_str().ok_or_else(|| {
-                Error(format!(
-                    "{FILE}: [harness].{name} harus berupa string perintah"
-                ))
+                Error(format!("{FILE}: [harness].{name} must be a command string"))
             })?;
             harness.push((name, cmd.to_string()));
         }
@@ -222,12 +218,12 @@ impl Config {
 pub fn default_toml(project_name: &str) -> String {
     let project_name = toml::Value::String(project_name.to_string()).to_string();
     format!(
-        r#"# Konfigurasi Tempa. Satu-satunya sumber aturan proyek.
+        r#"# Tempa configuration. The single source of project rules.
 [project]
 name = {project_name}
 tempa_version = "{version}"
 
-[docs]            # peran → nama file, bebas diganti
+[docs]            # role -> file name, rename freely
 context   = "AGENTS.md"
 plan      = "docs/plans/"
 decisions = "docs/decisions/"
@@ -237,7 +233,7 @@ harness   = "HARNESS.md"
 [agents]
 enabled = ["claude", "codex", "gemini", "opencode", "cursor"]
 
-[harness]         # dijalankan berurutan; semua harus exit 0
+[harness]         # run in order; every command must exit 0
 # format    = "bun run format:check"
 # lint = "bun run lint"
 # typecheck = "bun run typecheck"
@@ -247,10 +243,10 @@ enabled = ["claude", "codex", "gemini", "opencode", "cursor"]
 plan_before_edit      = true
 review_required       = false
 decision_required_for = ["new-dependency", "schema-change", "public-api"]
-schema_paths          = []   # mis. ["migrations/**"]
-public_api_paths      = []   # mis. ["src/api/**"]
+schema_paths          = []   # e.g. ["migrations/**"]
+public_api_paths      = []   # e.g. ["src/api/**"]
 max_diff_lines        = 800
-protected_paths       = [".env*", "tempa.toml"]   # tambahkan file CI, mis. "bitbucket-pipelines.yml" atau ".github/workflows/**"
+protected_paths       = [".env*", "tempa.toml"]   # add your CI files, e.g. "bitbucket-pipelines.yml" or ".github/workflows/**"
 
 [ci]
 base            = "main"
@@ -278,7 +274,7 @@ pub fn add_harness(root: &Path, name: &str, cmd: &str) -> Result<bool> {
             .entry("harness")
             .or_insert(toml_edit::table())
             .as_table_mut()
-            .ok_or_else(|| Error(format!("{FILE}: harness harus tabel")))?;
+            .ok_or_else(|| Error(format!("{FILE}: harness must be a table")))?;
         if table.contains_key(name) {
             return Ok(false);
         }
@@ -294,14 +290,14 @@ pub fn add_protected(root: &Path, glob: &str) -> Result<bool> {
             .entry("gates")
             .or_insert(toml_edit::table())
             .as_table_mut()
-            .ok_or_else(|| Error(format!("{FILE}: gates harus tabel")))?;
+            .ok_or_else(|| Error(format!("{FILE}: gates must be a table")))?;
         if !gates.contains_key("protected_paths") {
             let defaults: toml_edit::Array = Gates::default().protected_paths.iter().collect();
             gates.insert("protected_paths", toml_edit::value(defaults));
         }
         let arr = gates["protected_paths"]
             .as_array_mut()
-            .ok_or_else(|| Error(format!("{FILE}: gates.protected_paths harus array")))?;
+            .ok_or_else(|| Error(format!("{FILE}: gates.protected_paths must be an array")))?;
         if arr.iter().any(|v| v.as_str() == Some(glob)) {
             return Ok(false);
         }

@@ -1,8 +1,8 @@
 #!/bin/sh
-# Dipasang tempa init.
+# Installed by tempa init.
 command -v tempa >/dev/null 2>&1 || {
-  echo "tempa: perintah tidak ditemukan di PATH hook ini." >&2
-  echo "Pasang tempa, atau tambahkan lokasinya ke PATH aplikasi git kamu (mis. Sourcetree: jalankan dari terminal, atau atur PATH sistem)." >&2
+  echo "tempa: command not found on this hook's PATH." >&2
+  echo "Install tempa, or add its location to your git client's PATH (e.g. Sourcetree: launch it from a terminal, or set the system PATH)." >&2
   exit 1
 }
 exec tempa sync --fix

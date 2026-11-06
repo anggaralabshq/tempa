@@ -7,7 +7,7 @@ use tempa_core::{Finding, Severity, check, doctor, import, init, sync, task};
 #[command(
     name = "tempa",
     version,
-    about = "Satu kontrak konteks untuk semua coding agent"
+    about = "One context contract and workflow for every coding agent"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -16,59 +16,59 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Buat tempa.toml, dokumen kontrak, git hooks, dan dokumen serah-terima DevOps
+    /// Create tempa.toml, contract docs, git hooks and the DevOps handoff doc
     Init,
-    /// Laporan paritas per agent (selalu exit 0)
+    /// Per-agent parity report (always exits 0)
     Doctor,
-    /// Generate file konteks tiap agent dari AGENTS.md dan .tempa/
+    /// Generate each agent's context files from AGENTS.md and .tempa/
     Sync {
-        /// Hanya periksa drift, tidak menulis (untuk CI)
+        /// Only check for drift, write nothing (for CI)
         #[arg(long, conflicts_with = "fix")]
         check: bool,
-        /// Untuk hook pre-commit: sync + git add bila aman, blokir bila target diedit langsung
+        /// For the pre-commit hook: sync + git add when safe, block when a target was edited directly
         #[arg(long)]
         fix: bool,
-        /// Timpa target yang diedit langsung atau bukan buatan tempa
+        /// Overwrite targets that were edited directly or not written by tempa
         #[arg(long, conflicts_with_all = ["check", "fix"])]
         force: bool,
     },
-    /// Periksa drift, kontrak dokumen, aturan task, lalu harness
+    /// Check drift, contract docs, task rules, then the harness
     Check {
-        /// Lewati harness (untuk step Bitbucket Pipelines)
+        /// Skip the harness (for a CI step)
         #[arg(long)]
         contract_only: bool,
-        /// Branch dasar (default: BITBUCKET_PR_DESTINATION_BRANCH atau [ci].base)
+        /// Base branch (default: BITBUCKET_PR_DESTINATION_BRANCH or [ci].base)
         #[arg(long)]
         base: Option<String>,
     },
-    /// Kelola task di luar aplikasi
+    /// Manage tasks from the command line
     Task {
         #[command(subcommand)]
         cmd: TaskCmd,
     },
-    /// Buat decision record baru dari template
+    /// Create a decision record from the template
     Decide { slug: String },
-    /// Tambah entri changes untuk task saat ini
+    /// Add a changes entry for the current task
     Log {
         #[arg(long)]
         summary: String,
         #[arg(long)]
         reason: String,
-        /// Path decision terkait
+        /// Path of the related decision
         #[arg(long)]
         decision: Option<String>,
-        /// lulus | gagal | belum
-        #[arg(long, default_value = "belum")]
+        /// pass | fail | pending
+        #[arg(long, default_value = "pending")]
         harness: String,
-        /// Agent dan model, mis. "codex / gpt-5"
+        /// Agent and model, e.g. "codex / gpt-5"
         #[arg(long)]
         agent: String,
     },
-    /// Cetak body PR untuk ditempel ke Bitbucket
+    /// Print the pull request body
     PrBody,
-    /// Serap .claude/, CLAUDE.md, .cursorrules, dll. ke sumber netral, lalu sync
+    /// Absorb .claude/, CLAUDE.md, .cursorrules, etc. into the neutral source, then sync
     Import {
-        /// Tulis perubahan (tanpa flag ini hanya laporan)
+        /// Write changes (without this flag, report only)
         #[arg(long)]
         yes: bool,
     },
@@ -76,9 +76,9 @@ enum Cmd {
 
 #[derive(Subcommand)]
 enum TaskCmd {
-    /// Buat branch tempa/<id> dan file plan
+    /// Create branch tempa/<id> and its plan file
     New { slug: String },
-    /// Tandai plan disetujui (panduan proses)
+    /// Mark the plan approved (a human step)
     Approve,
 }
 
@@ -86,7 +86,7 @@ fn warn_hooks_path(root: &Path) {
     if let Some(p) = tempa_core::gitx::get_config(root, "core.hooksPath") {
         if p != init::HOOKS_DIR {
             println!(
-                "peringatan: core.hooksPath = {p}, tidak diganti. Panggil `tempa sync --fix` dari hook pre-commit dan `tempa check` dari hook pre-push di sana."
+                "warning: core.hooksPath = {p}, left unchanged. Call `tempa sync --fix` from its pre-commit hook and `tempa check` from its pre-push hook."
             );
         }
     }
@@ -109,17 +109,17 @@ fn print_doctor(r: &doctor::DoctorReport) {
     }
     for g in r.rows.iter().flat_map(|row| &row.gaps) {
         println!(
-            "- {} {}: {} (disajikan lewat tempa_context mulai M3; ditegakkan CI)",
+            "- {} {}: {} (served via tempa_context; enforced by tempa check)",
             g.agent.name(),
             g.kind,
             g.name
         );
     }
     for l in &r.legacy {
-        println!("legacy: {l} (boleh dihapus setelah dicek)");
+        println!("legacy: {l} (safe to delete once reviewed)");
     }
     if !r.hooks_ok {
-        println!("peringatan: git hooks belum terpasang; jalankan tempa init");
+        println!("warning: git hooks are not installed; run tempa init");
     }
     println!("drift: {}", r.drift);
 }
@@ -129,17 +129,17 @@ fn print_import(r: &import::ImportReport) {
         println!("created {p}");
     }
     for p in &r.written {
-        println!("ditulis: {p}");
+        println!("write: {p}");
     }
     for p in &r.merged_from {
-        println!("digabung dari: {p}");
+        println!("merged from: {p}");
     }
-    println!("paragraf duplikat dilewati: {}", r.duplicates_skipped);
+    println!("duplicate paragraphs skipped: {}", r.duplicates_skipped);
     for (n, c) in &r.harness_added {
-        println!("harness ditambahkan: {n} = {c}");
+        println!("harness added: {n} = {c}");
     }
     for g in &r.protected_added {
-        println!("protected_paths ditambahkan: {g}");
+        println!("protected_paths added: {g}");
     }
     for g in &r.gaps {
         println!("gap: {g}");
@@ -181,7 +181,7 @@ fn git_add(root: &Path, paths: &[String]) -> tempa_core::Result<()> {
         .output()?;
     if !out.status.success() {
         return Err(tempa_core::Error(format!(
-            "git add gagal: {}",
+            "git add failed: {}",
             String::from_utf8_lossy(&out.stderr)
         )));
     }
@@ -219,7 +219,7 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
         } => {
             let id = task::task_new(root, &slug)?;
             println!(
-                "task {id} dibuat di branch tempa/{id}; isi plan lalu jalankan tempa task approve"
+                "task {id} created on branch tempa/{id}; fill in the plan, then run tempa task approve"
             );
             Ok(false)
         }
@@ -227,7 +227,7 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
             cmd: TaskCmd::Approve,
         } => {
             task::task_approve(root)?;
-            println!("plan disetujui");
+            println!("plan approved");
             Ok(false)
         }
         Cmd::Decide { slug } => {
@@ -251,13 +251,13 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
                     agent,
                 },
             )?;
-            println!("entri changes ditambahkan");
+            println!("changes entry added");
             Ok(false)
         }
         Cmd::Init => {
             if let Some(p) = init::existing_agent_context(root) {
                 return Err(tempa_core::Error(format!(
-                    "repo ini sudah punya konteks agent ({p}); jalankan `tempa import --yes` (import juga menyiapkan tempa init)"
+                    "this repo already has agent context ({p}); run `tempa import --yes` instead (import also does what init does)"
                 )));
             }
             for p in init::init(root)? {
@@ -267,7 +267,9 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
                 println!("synced {p}");
             }
             warn_hooks_path(root);
-            println!("Serahkan docs/tempa-devops.md ke tim DevOps.");
+            println!(
+                "Hand docs/tempa-devops.md to whoever owns CI when you are ready to enforce in CI."
+            );
             Ok(false)
         }
         Cmd::Doctor => {
@@ -282,7 +284,7 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
             let report = import::import(root, yes)?;
             print_import(&report);
             if !yes {
-                println!("Jalankan ulang dengan --yes untuk menulis.");
+                println!("Run again with --yes to write.");
                 return Ok(false);
             }
             for p in &report.synced {
@@ -291,7 +293,7 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
             warn_hooks_path(root);
             for p in &report.conflicts {
                 eprintln!(
-                    "error[sync.conflict] {p}: editan tidak bisa diserap; pindahkan ke sumbernya lalu jalankan tempa sync --force"
+                    "error[sync.conflict] {p}: edit could not be absorbed; move it into its source, then run tempa sync --force"
                 );
             }
             Ok(!report.conflicts.is_empty())

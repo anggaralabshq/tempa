@@ -76,7 +76,7 @@ impl Plan {
             if self.rendered.get(from).map(|r| hash(r)).as_ref() != Some(l));
         if current.is_some() && source_moved {
             self.report.gaps.push(format!(
-                "{to} berubah sejak sync terakhir dan {from} juga diedit; editan tidak diserap, gabungkan manual"
+                "{to} changed since the last sync and {from} was edited too; edit not absorbed, merge by hand"
             ));
             return;
         }
@@ -163,11 +163,9 @@ fn expand(root: &Path, text: &str, context: &str, gaps: &mut Vec<String>, from: 
                     out.push('\n');
                     continue;
                 }
-                Include::Missing => {
-                    gaps.push(format!("{from}: @{path} tidak ditemukan, baris dibiarkan"))
-                }
+                Include::Missing => gaps.push(format!("{from}: @{path} not found, line kept")),
                 Include::Outside => {
-                    gaps.push(format!("{from}: @{path} di luar repo, tidak di-inline"))
+                    gaps.push(format!("{from}: @{path} is outside the repo, not inlined"))
                 }
             }
             out.push_str(line);
@@ -280,7 +278,7 @@ fn copy_in(root: &Path, from: &str, to: &str, plan: &mut Plan) -> Result<()> {
         }
         State::Foreign => match std::fs::read(root.join(to)) {
             Ok(existing) if hash(&existing) != hash(&bytes) => plan.report.gaps.push(format!(
-                "{to} sudah ada dengan isi berbeda dari {from}; tidak ditimpa"
+                "{to} already exists with content different from {from}; not overwritten"
             )),
             _ => plan.put(root, from, to, bytes),
         },
@@ -300,7 +298,7 @@ fn copy_items(root: &Path, plan: &mut Plan) -> Result<()> {
             if !inside(root, &path) {
                 plan.report
                     .gaps
-                    .push(format!("{from}: symlink ke luar repo, tidak disalin"));
+                    .push(format!("{from}: symlink outside the repo, not copied"));
                 continue;
             }
             let known = plan.lock.files.contains_key(&from) || plan.rendered.contains_key(&from);
@@ -338,7 +336,7 @@ fn config_bases(root: &Path, plan: &mut Plan) -> Result<()> {
         } else {
             "JSON"
         };
-        let invalid = |e: String| Error(format!("{from} bukan {kind} valid: {e}"));
+        let invalid = |e: String| Error(format!("{from} is not valid {kind}: {e}"));
         let base = if from.ends_with(".toml") {
             let mut doc: toml_edit::DocumentMut = text
                 .parse()
@@ -391,7 +389,7 @@ fn settings(root: &Path, cfg: &Config, plan: &mut Plan) -> Result<()> {
         return Ok(());
     };
     let v: Value =
-        serde_json::from_str(&text).map_err(|e| Error(format!("{from} bukan JSON valid: {e}")))?;
+        serde_json::from_str(&text).map_err(|e| Error(format!("{from} is not valid JSON: {e}")))?;
     let r = &mut plan.report;
 
     let mut protected: BTreeSet<String> = cfg.gates.protected_paths.iter().cloned().collect();
@@ -417,7 +415,7 @@ fn settings(root: &Path, cfg: &Config, plan: &mut Plan) -> Result<()> {
             }
             _ => r
                 .gaps
-                .push(format!("deny rule {rule} tidak punya padanan lintas-agent")),
+                .push(format!("deny rule {rule} has no cross-agent equivalent")),
         }
     }
 
@@ -443,9 +441,13 @@ fn settings(root: &Path, cfg: &Config, plan: &mut Plan) -> Result<()> {
             classify(cmd)
         };
         match name {
-            Some(n) if harness.insert(n.to_string()) => r.harness_added.push((n.to_string(), cmd.to_string())),
+            Some(n) if harness.insert(n.to_string()) => {
+                r.harness_added.push((n.to_string(), cmd.to_string()))
+            }
             Some(_) => {}
-            None => r.gaps.push(format!("hook `{cmd}` tidak bisa dijadikan perintah harness; tetap berlaku untuk Claude saja")),
+            None => r.gaps.push(format!(
+                "hook `{cmd}` cannot become a harness command; it stays Claude-only"
+            )),
         }
     }
     Ok(())
@@ -508,7 +510,7 @@ fn mcp_server(from: &str, name: &str, v: &Value, gaps: &mut Vec<String>) -> McpS
         let ok = KNOWN.contains(&k.as_str()) && !(k == "type" && x.as_str() == Some("sse"));
         if !ok {
             gaps.push(format!(
-                "mcp {name} ({from}): field {k} tidak dibawa ke agent lain"
+                "mcp {name} ({from}): field {k} is not carried to other agents"
             ));
         }
     }
@@ -531,7 +533,7 @@ fn codex_servers(text: &str, gaps: &mut Vec<String>) -> Vec<(String, McpServer)>
                 .filter(|k| !["command", "args", "env", "url"].contains(&k.as_str()))
             {
                 gaps.push(format!(
-                    "mcp {name} (.codex/config.toml): field {k} tidak dibawa ke agent lain"
+                    "mcp {name} (.codex/config.toml): field {k} is not carried to other agents"
                 ));
             }
             let s: McpServer = t.clone().try_into().ok()?;
@@ -549,7 +551,7 @@ fn codex_servers(text: &str, gaps: &mut Vec<String>) -> Vec<(String, McpServer)>
 fn mcp(root: &Path, plan: &mut Plan) -> Result<()> {
     let to = format!("{TEMPA_DIR}/mcp.toml");
     let mut file: McpFile = match std::fs::read_to_string(root.join(&to)) {
-        Ok(t) => toml::from_str(&t).map_err(|e| Error(format!("{to} tidak valid: {e}")))?,
+        Ok(t) => toml::from_str(&t).map_err(|e| Error(format!("{to} is invalid: {e}")))?,
         Err(_) => McpFile::default(),
     };
     let mut added = false;
@@ -568,7 +570,7 @@ fn mcp(root: &Path, plan: &mut Plan) -> Result<()> {
             codex_servers(&text, gaps)
         } else {
             let v: Value = serde_json::from_str(&text)
-                .map_err(|e| Error(format!("{from} bukan JSON valid: {e}")))?;
+                .map_err(|e| Error(format!("{from} is not valid JSON: {e}")))?;
             let key = mcp_key(from).expect("json config has an mcp key");
             v[key]
                 .as_object()

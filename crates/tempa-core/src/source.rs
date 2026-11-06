@@ -90,7 +90,7 @@ pub fn walk(dir: &Path) -> Result<Vec<(String, std::path::PathBuf)>> {
     ) -> Result<()> {
         if depth > 32 {
             return Err(Error(format!(
-                "{}: folder terlalu dalam (symlink berputar?)",
+                "{}: directory nesting too deep (symlink loop?)",
                 dir.display()
             )));
         }
@@ -131,7 +131,7 @@ fn walk_source(root: &Path, dir: &Path) -> Result<Vec<(String, std::path::PathBu
     let files = walk(dir)?;
     if let Some((_, p)) = files.iter().find(|(_, p)| !inside(root, p)) {
         return Err(Error(format!(
-            "{}: symlink ke luar repo tidak diizinkan di .tempa/",
+            "{}: symlinks outside the repo are not allowed in .tempa/",
             p.display()
         )));
     }
@@ -168,7 +168,7 @@ pub fn load(root: &Path, cfg: &Config) -> Result<Source> {
     let mcp = match std::fs::read_to_string(t.join("mcp.toml")) {
         Ok(text) => {
             toml::from_str::<McpFile>(&text)
-                .map_err(|e| Error(format!(".tempa/mcp.toml tidak valid: {e}")))?
+                .map_err(|e| Error(format!(".tempa/mcp.toml is invalid: {e}")))?
                 .servers
         }
         Err(_) => BTreeMap::new(),
@@ -183,7 +183,7 @@ pub fn load(root: &Path, cfg: &Config) -> Result<Source> {
         }
         let bytes = std::fs::read(path)?;
         let text = String::from_utf8_lossy(&bytes);
-        let invalid = |e: String| Error(format!("{TEMPA_DIR}/targets/{rel} tidak valid: {e}"));
+        let invalid = |e: String| Error(format!("{TEMPA_DIR}/targets/{rel} is invalid: {e}"));
         if rel.ends_with(".json") {
             serde_json::from_str::<serde_json::Value>(&text).map_err(|e| invalid(e.to_string()))?;
         } else if rel.ends_with(".toml") {

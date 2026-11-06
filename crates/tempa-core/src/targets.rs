@@ -285,7 +285,7 @@ fn codex_mcp(out: &mut Out, name: &str, s: &McpServer, t: &mut toml_edit::Table)
             Some(n) if n == k => fwd.push(n),
             _ if v.contains("${") => out.gap(
                 "mcp",
-                &format!("{name}: env {k}={v} (Codex tidak bisa mengganti nama variabel)"),
+                &format!("{name}: env {k}={v} (Codex cannot rename variables)"),
             ),
             _ => {
                 env.insert(k, v.as_str().into());
@@ -305,7 +305,7 @@ fn codex_mcp(out: &mut Out, name: &str, s: &McpServer, t: &mut toml_edit::Table)
         } else if v.contains("${") {
             out.gap(
                 "mcp",
-                &format!("{name}: header {k} (format nilai tidak didukung Codex)"),
+                &format!("{name}: header {k} (value format not supported by Codex)"),
             );
         } else {
             hdr.insert(k, v.as_str().into());
@@ -439,7 +439,7 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 if (1..=9).any(|n| c.body.contains(&format!("${n}"))) {
                     o.gap(
                         "commands",
-                        &format!("{} ($1..$9 tidak didukung Gemini; pakai $ARGUMENTS)", c.rel),
+                        &format!("{} ($1..$9 not supported by Gemini; use $ARGUMENTS)", c.rel),
                     );
                 }
                 t += &format!("prompt = {}\n", toml_multiline(&gemini_prompt(&c.body)));

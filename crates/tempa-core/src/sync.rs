@@ -36,7 +36,7 @@ impl Lock {
         match std::fs::read(root.join(LOCK)) {
             Ok(b) => serde_json::from_slice(&b).map_err(|e| {
                 Error(format!(
-                    "{LOCK} tidak valid ({e}); selesaikan konfliknya, atau hapus file itu lalu jalankan tempa sync --force"
+                    "{LOCK} is invalid ({e}); resolve the conflict, or delete it and run tempa sync --force"
                 ))
             }),
             Err(_) => Ok(Lock::default()),
@@ -108,7 +108,7 @@ pub fn sync(root: &Path) -> Result<Vec<String>> {
     let (changed, conflicts) = sync_with(root, &|_| false)?;
     if !conflicts.is_empty() {
         return Err(Error(format!(
-            "tidak ditimpa karena bukan hasil tempa atau sudah diedit langsung: {} — serap dengan `tempa import --yes`, atau timpa dengan `tempa sync --force`",
+            "not overwritten because tempa did not write them or they were edited directly: {}. Absorb with `tempa import --yes`, or overwrite with `tempa sync --force`",
             conflicts.join(", ")
         )));
     }
@@ -227,32 +227,32 @@ pub fn drift_findings(d: &[Drift]) -> Vec<Finding> {
             Drift::Modified(p) if absorbs_edit(p) => Finding::error(
                 "drift.modified",
                 Some(p.clone()),
-                "diedit langsung — jalankan tempa import --yes untuk menyerap",
+                "edited directly; run tempa import --yes to absorb",
             ),
             Drift::Modified(p) => Finding::error(
                 "drift.modified",
                 Some(p.clone()),
-                "diedit langsung — pindahkan editan ke sumbernya (AGENTS.md atau .tempa/), lalu jalankan tempa sync --force",
+                "edited directly; move the edit into its source (AGENTS.md or .tempa/), then run tempa sync --force",
             ),
             Drift::Untracked(p) if absorbs_new(p) => Finding::error(
                 "drift.untracked",
                 Some(p.clone()),
-                "file baru di folder milik tempa — jalankan tempa import --yes untuk menyerap",
+                "new file in a tempa-owned directory; run tempa import --yes to absorb",
             ),
             Drift::Untracked(p) => Finding::error(
                 "drift.untracked",
                 Some(p.clone()),
-                "file baru di folder milik tempa — buat sumbernya di .tempa/commands/ (markdown) lalu hapus file ini",
+                "new file in a tempa-owned directory; create its source in .tempa/commands/ (markdown), then delete this file",
             ),
             Drift::Missing(p) => Finding::error(
                 "drift.missing",
                 Some(p.clone()),
-                "file hasil generate hilang — jalankan tempa sync",
+                "generated file is missing; run tempa sync",
             ),
             Drift::Stale(p) => Finding::error(
                 "drift.stale",
                 Some(p.clone()),
-                "sumber berubah, belum di-sync — jalankan tempa sync",
+                "source changed but not synced; run tempa sync",
             ),
         })
         .collect()
@@ -275,7 +275,7 @@ pub fn sync_fix(root: &Path) -> Result<(Vec<String>, Vec<Finding>)> {
                 Finding::error(
                     "sync.unstaged_source",
                     Some(p),
-                    "sumber punya perubahan yang belum di-stage — git add (atau git stash) dulu agar hasil generate sama dengan yang di-commit",
+                    "source has unstaged changes; git add (or git stash) them first so generated files match what is committed",
                 )
             })
             .collect();

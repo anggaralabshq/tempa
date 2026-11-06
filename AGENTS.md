@@ -19,7 +19,7 @@ CLI Rust yang menjaga satu kontrak konteks (AGENTS.md + `.tempa/` + `tempa.toml`
 
 - TDD: test yang gagal dulu, baru kode. Regresi dari review masuk `crates/tempa-core/tests/review_fixes.rs` atau file test modulnya.
 - Logika di `tempa-core` berupa fungsi murni sebisa mungkin; CLI hanya parsing argumen dan mencetak.
-- Pesan untuk pengguna dalam Bahasa Indonesia; identifier dan komentar kode dalam Bahasa Inggris.
+- Semua teks untuk pengguna (pesan CLI, help, README, template) dalam Bahasa Inggris. Kosakata kontrak (heading wajib, field changes, section pr-body) tetap seperti di config.
 - Setiap temuan berbentuk `Finding { code, severity, path, message }`; kode stabil seperti `drift.modified`.
 - Jangan pernah menimpa file milik pengguna tanpa bukti tempa yang menulisnya (lock hash) atau `--force`.
 - Format target per agent hanya boleh berubah bersama `docs/target-matrix.md` dan sumber docs resminya.

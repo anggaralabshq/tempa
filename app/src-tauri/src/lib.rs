@@ -2,8 +2,10 @@
 
 mod contract;
 mod env;
+mod mcp_host;
 mod projects;
 mod pty;
+mod verify;
 mod watcher;
 
 use pty::{CommandBuilder, PtyManager};
@@ -135,9 +137,32 @@ fn watch_stop(watches: State<'_, Watches>, root: String) {
     watches.0.lock().unwrap().remove(&root);
 }
 
+/// Last host-recorded harness run of `task` in project `root`.
+#[tauri::command]
+fn verify_result(
+    app: tauri::AppHandle,
+    root: String,
+    task: String,
+) -> Result<Option<verify::Verify>, String> {
+    let data = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    Ok(verify::load(&verify::file(&data, &root, &task)))
+}
+
 #[tauri::command]
 fn pty_kill(ptys: State<'_, PtyManager>, id: u32) -> Result<(), String> {
     ptys.kill(id)
+}
+
+/// `tempa-app --mcp <root> --verify <file>`: serve the injected tempa MCP server and
+/// exit. Returns false when the arguments are not that mode.
+pub fn mcp_mode(args: &[String]) -> bool {
+    match args {
+        [_, mcp, root, verify, file] if mcp == "--mcp" && verify == "--verify" => {
+            mcp_host::serve(std::path::Path::new(root), std::path::Path::new(file));
+            true
+        }
+        _ => false,
+    }
 }
 
 pub fn run() {
@@ -158,7 +183,8 @@ pub fn run() {
             contract_preview,
             contract_run,
             watch_start,
-            watch_stop
+            watch_stop,
+            verify_result
         ])
         .build(tauri::generate_context!())
         .expect("tempa app failed to start")

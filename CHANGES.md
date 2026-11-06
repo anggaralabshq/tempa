@@ -89,3 +89,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-app-watcher
+- Ringkasan: Watcher: source edits sync automatically, drift shows as a sidebar badge
+- Alasan: M2: keep agent files in sync without remembering to run tempa sync
+- Decision: docs/decisions/2026-11-06-watcher-on-notify.md
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

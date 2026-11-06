@@ -1,4 +1,4 @@
-# Image untuk step Bitbucket Pipelines `tempa check --contract-only`.
+# Image for the Bitbucket Pipelines step `tempa check --contract-only`.
 FROM rust:1.85-alpine AS build
 RUN apk add --no-cache musl-dev
 WORKDIR /src

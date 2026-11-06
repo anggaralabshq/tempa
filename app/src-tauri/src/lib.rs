@@ -4,10 +4,17 @@ mod contract;
 mod env;
 mod projects;
 mod pty;
+mod watcher;
 
 use pty::{CommandBuilder, PtyManager};
+use std::collections::HashMap;
+use std::sync::Mutex;
 use tauri::ipc::{Channel, Response};
-use tauri::{Manager, RunEvent, State};
+use tauri::{Emitter, Manager, RunEvent, State};
+
+/// One watcher per open project, keyed by root. Dropping a `Watch` stops it.
+#[derive(Default)]
+struct Watches(Mutex<HashMap<String, watcher::Watch>>);
 
 #[tauri::command]
 fn app_version() -> String {
@@ -103,6 +110,27 @@ async fn contract_run(root: String, action: String) -> Result<Vec<String>, Strin
     contract::run(std::path::Path::new(&root), &action)
 }
 
+/// Watch `root`: source edits sync, drift changes emit `contract-changed` with an `Update`.
+#[tauri::command]
+fn watch_start(
+    app: tauri::AppHandle,
+    watches: State<'_, Watches>,
+    root: String,
+) -> Result<(), String> {
+    let key = root.clone();
+    let w = watcher::watch(std::path::Path::new(&root), move |mut u| {
+        u.root.clone_from(&key); // the frontend's key, not the canonical path
+        let _ = app.emit("contract-changed", u);
+    })?;
+    watches.0.lock().unwrap().insert(root, w);
+    Ok(())
+}
+
+#[tauri::command]
+fn watch_stop(watches: State<'_, Watches>, root: String) {
+    watches.0.lock().unwrap().remove(&root);
+}
+
 #[tauri::command]
 fn pty_kill(ptys: State<'_, PtyManager>, id: u32) -> Result<(), String> {
     ptys.kill(id)
@@ -112,6 +140,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(PtyManager::default())
+        .manage(Watches::default())
         .invoke_handler(tauri::generate_handler![
             app_version,
             pty_spawn,
@@ -123,7 +152,9 @@ pub fn run() {
             projects_remove,
             contract_status,
             contract_preview,
-            contract_run
+            contract_run,
+            watch_start,
+            watch_stop
         ])
         .build(tauri::generate_context!())
         .expect("tempa app failed to start")

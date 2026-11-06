@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::Path;
 use std::process::{Command, ExitCode};
-use tempa_core::{Finding, Severity, check, import, sync};
+use tempa_core::{Finding, Severity, check, import, sync, task};
 
 #[derive(Parser)]
 #[command(name = "tempa", version, about = "Satu kontrak konteks untuk semua coding agent")]
@@ -30,12 +30,45 @@ enum Cmd {
         #[arg(long)]
         base: Option<String>,
     },
+    /// Kelola task di luar aplikasi
+    Task {
+        #[command(subcommand)]
+        cmd: TaskCmd,
+    },
+    /// Buat decision record baru dari template
+    Decide { slug: String },
+    /// Tambah entri changes untuk task saat ini
+    Log {
+        #[arg(long)]
+        summary: String,
+        #[arg(long)]
+        reason: String,
+        /// Path decision terkait
+        #[arg(long)]
+        decision: Option<String>,
+        /// lulus | gagal | belum
+        #[arg(long, default_value = "belum")]
+        harness: String,
+        /// Agent dan model, mis. "codex / gpt-5"
+        #[arg(long)]
+        agent: String,
+    },
+    /// Cetak body PR untuk ditempel ke Bitbucket
+    PrBody,
     /// Serap .claude/, CLAUDE.md, .cursorrules, dll. ke sumber netral, lalu sync
     Import {
         /// Tulis perubahan (tanpa flag ini hanya laporan)
         #[arg(long)]
         yes: bool,
     },
+}
+
+#[derive(Subcommand)]
+enum TaskCmd {
+    /// Buat branch tempa/<id> dan file plan
+    New { slug: String },
+    /// Tandai plan disetujui (panduan proses)
+    Approve,
 }
 
 fn print_import(r: &import::ImportReport) {
@@ -107,6 +140,29 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
         }
         Cmd::Check { contract_only, base } => {
             Ok(print_findings(&check::check(root, &check::CheckOpts { contract_only, base })?))
+        }
+        Cmd::Task { cmd: TaskCmd::New { slug } } => {
+            let id = task::task_new(root, &slug)?;
+            println!("task {id} dibuat di branch tempa/{id}; isi plan lalu jalankan tempa task approve");
+            Ok(false)
+        }
+        Cmd::Task { cmd: TaskCmd::Approve } => {
+            task::task_approve(root)?;
+            println!("plan disetujui");
+            Ok(false)
+        }
+        Cmd::Decide { slug } => {
+            println!("{}", task::decide(root, &slug)?);
+            Ok(false)
+        }
+        Cmd::Log { summary, reason, decision, harness, agent } => {
+            task::log(root, &task::LogEntry { summary, reason, decision, harness, agent })?;
+            println!("entri changes ditambahkan");
+            Ok(false)
+        }
+        Cmd::PrBody => {
+            print!("{}", task::pr_body(root)?);
+            Ok(false)
         }
         Cmd::Import { yes } => {
             let report = import::import(root, yes)?;

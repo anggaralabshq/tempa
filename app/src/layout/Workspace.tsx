@@ -1,4 +1,6 @@
-import { useEffect, useReducer } from "react";
+import { useEffect, useReducer, useState } from "react";
+import AgentPicker from "../chat/AgentPicker";
+import Chat from "../chat/Chat";
 import Terminal from "../terminal/Terminal";
 import { leaves, rects } from "./panes";
 import { shortcut } from "./shortcuts";
@@ -8,10 +10,11 @@ let seq = 0;
 const nextId = (p: string) => `${p}${++seq}`;
 const mac = navigator.platform.toLowerCase().includes("mac");
 
-/** Tabs of split panes; every pane is one terminal in `cwd`. */
+/** Tabs of split panes; each pane is a terminal in `cwd`, or an agent chat. */
 export default function Workspace({ cwd, active: shown }: { cwd: string | null; active: boolean }) {
   const [s, dispatch] = useReducer(reduce, empty, (e) => reduce(e, { type: "new", tab: nextId("t"), pane: nextId("p") }));
   const active = s.tabs.find((t) => t.id === s.active);
+  const [picking, setPicking] = useState(false);
 
   const run = (cmd: ReturnType<typeof shortcut>) => {
     if (cmd === "newTab") dispatch({ type: "new", tab: nextId("t"), pane: nextId("p") });
@@ -45,7 +48,7 @@ export default function Workspace({ cwd, active: shown }: { cwd: string | null; 
             onClick={() => dispatch({ type: "select", tab: t.id })}
             className={`flex cursor-default items-center gap-2 rounded px-2 py-1 ${t.id === s.active ? "bg-white/10" : "text-white/60 hover:bg-white/5"}`}
           >
-            Terminal {i + 1}
+            {s.chats[t.focus] ? "Chat" : "Terminal"} {i + 1}
             <button
               type="button"
               aria-label="Close tab"
@@ -62,6 +65,11 @@ export default function Workspace({ cwd, active: shown }: { cwd: string | null; 
         <button type="button" aria-label="New tab" onClick={() => run("newTab")} className="px-2 text-white/60 hover:text-white">
           +
         </button>
+        {cwd && (
+          <button type="button" onClick={() => setPicking((p) => !p)} className="px-2 text-white/60 hover:text-white">
+            Chat
+          </button>
+        )}
         <div className="ml-auto flex gap-1">
           <button type="button" title="Split right" onClick={() => run("splitRight")} className="px-2 text-white/60 hover:text-white">
             ◫
@@ -72,6 +80,16 @@ export default function Workspace({ cwd, active: shown }: { cwd: string | null; 
         </div>
       </div>
       <div className="relative min-h-0 flex-1">
+        {picking && cwd && (
+          <div className="absolute left-2 top-1 z-10 w-64 rounded border border-white/10 bg-neutral-900 shadow-lg">
+            <AgentPicker
+              onPick={(agent) => {
+                setPicking(false);
+                dispatch({ type: "newChat", tab: nextId("t"), pane: nextId("p"), chat: { agent, task: null, cwd } });
+              }}
+            />
+          </div>
+        )}
         {s.tabs.length === 0 && (
           <button type="button" onClick={() => run("newTab")} className="absolute inset-0 m-auto h-8 w-40 rounded bg-white/10">
             New terminal
@@ -93,11 +111,15 @@ export default function Workspace({ cwd, active: shown }: { cwd: string | null; 
               }}
               className={`absolute border ${t.id === s.active && t.focus === id && leaves(t.root).length > 1 ? "border-sky-500/60" : "border-transparent"}`}
             >
-              <Terminal
-                cwd={cwd}
-                focused={shown && t.id === s.active && t.focus === id}
-                onExit={() => dispatch({ type: "closePane", pane: id })}
-              />
+              {s.chats[id] && cwd ? (
+                <Chat root={cwd} {...s.chats[id]} focused={shown && t.id === s.active && t.focus === id} />
+              ) : (
+                <Terminal
+                  cwd={cwd}
+                  focused={shown && t.id === s.active && t.focus === id}
+                  onExit={() => dispatch({ type: "closePane", pane: id })}
+                />
+              )}
             </div>
           ));
         })}

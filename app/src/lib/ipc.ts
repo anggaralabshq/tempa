@@ -49,3 +49,26 @@ export const onContractChanged = (cb: (u: ContractUpdate) => void) =>
 /** Sidebar badge: drift plus contract errors. */
 export const problemCount = (s: ContractStatus) =>
   s.drift.length + s.findings.filter((f) => f.severity === "error").length;
+
+export type Agent = { id: string; name: string; installed: boolean; hint: string | null; lifecycle: boolean };
+export type ChatStarted = { id: number; current_model: string | null; models: [string, string][] };
+// biome-ignore lint/suspicious/noExplicitAny: ACP payloads are rendered field by field.
+export type ChatEvent = { type: string; [k: string]: any };
+export const agentList = () => invoke<Agent[]>("agent_list");
+export async function chatStart(
+  root: string,
+  cwd: string,
+  agent: string,
+  task: string | null,
+  onEvent: (e: ChatEvent) => void,
+): Promise<ChatStarted> {
+  const ch = new Channel<ChatEvent>();
+  ch.onmessage = onEvent;
+  return invoke<ChatStarted>("chat_start", { root, cwd, agent, task, onEvent: ch });
+}
+export const chatPrompt = (id: number, text: string) => invoke("chat_prompt", { id, text });
+export const chatCancel = (id: number) => invoke("chat_cancel", { id });
+export const chatStop = (id: number) => invoke("chat_stop", { id });
+export const chatSetModel = (id: number, model: string) => invoke("chat_set_model", { id, model });
+export const chatPermission = (id: number, request: number, option: string | null) =>
+  invoke("chat_permission", { id, request, option });

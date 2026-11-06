@@ -26,7 +26,9 @@ Pemeriksaan:
 - `tempa check`: drift, kontrak dokumen, aturan task, dan harness. Hook pre-push menjalankannya. CI memakai `--contract-only`.
 - `tempa doctor`: paritas per agent, gap, dan file legacy.
 
-Jangan edit file hasil generate (`CLAUDE.md`, `.claude/commands/`, `.gemini/`, dll.) secara langsung. Ubah sumbernya, atau serap editan dengan `tempa import --yes`.
+Jangan edit file hasil generate (`CLAUDE.md`, `.claude/commands/`, `.gemini/`, dll.) secara langsung. Ubah sumbernya, atau serap editan dengan `tempa import --yes`. `tempa sync` tidak pernah menimpa file yang bukan buatannya atau yang sudah diedit; `tempa sync --force` menimpanya dengan sengaja.
+
+Hook pre-commit hanya men-sync dari sumber yang sudah di-stage (`git add`), dan ikut men-stage `.tempa/lock.json`.
 
 ## CI dan merge
 

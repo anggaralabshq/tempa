@@ -28,6 +28,9 @@ enum Cmd {
         /// Untuk hook pre-commit: sync + git add bila aman, blokir bila target diedit langsung
         #[arg(long)]
         fix: bool,
+        /// Timpa target yang diedit langsung atau bukan buatan tempa
+        #[arg(long, conflicts_with_all = ["check", "fix"])]
+        force: bool,
     },
     /// Periksa drift, kontrak dokumen, aturan task, lalu harness
     Check {
@@ -77,6 +80,16 @@ enum TaskCmd {
     New { slug: String },
     /// Tandai plan disetujui (panduan proses)
     Approve,
+}
+
+fn warn_hooks_path(root: &Path) {
+    if let Some(p) = tempa_core::gitx::get_config(root, "core.hooksPath") {
+        if p != init::HOOKS_DIR {
+            println!(
+                "peringatan: core.hooksPath = {p}, tidak diganti. Panggil `tempa sync --fix` dari hook pre-commit dan `tempa check` dari hook pre-push di sana."
+            );
+        }
+    }
 }
 
 fn print_doctor(r: &doctor::DoctorReport) {
@@ -183,7 +196,7 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
         Cmd::Sync { fix: true, .. } => {
             let (changed, blockers) = sync::sync_fix(root)?;
             if !blockers.is_empty() {
-                return Ok(print_findings(&sync::drift_findings(&blockers)));
+                return Ok(print_findings(&blockers));
             }
             git_add(root, &changed)?;
             for p in &changed {
@@ -242,12 +255,18 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
             Ok(false)
         }
         Cmd::Init => {
+            if let Some(p) = init::existing_agent_context(root) {
+                return Err(tempa_core::Error(format!(
+                    "repo ini sudah punya konteks agent ({p}); jalankan `tempa import --yes` (import juga menyiapkan tempa init)"
+                )));
+            }
             for p in init::init(root)? {
                 println!("created {p}");
             }
             for p in sync::sync(root)? {
                 println!("synced {p}");
             }
+            warn_hooks_path(root);
             println!("Serahkan docs/tempa-devops.md ke tim DevOps.");
             Ok(false)
         }
@@ -266,13 +285,24 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
                 println!("Jalankan ulang dengan --yes untuk menulis.");
                 return Ok(false);
             }
-            for p in sync::sync(root)? {
+            for p in &report.synced {
                 println!("synced {p}");
             }
-            Ok(false)
+            warn_hooks_path(root);
+            for p in &report.conflicts {
+                eprintln!(
+                    "error[sync.conflict] {p}: editan tidak bisa diserap; pindahkan ke sumbernya lalu jalankan tempa sync --force"
+                );
+            }
+            Ok(!report.conflicts.is_empty())
         }
-        Cmd::Sync { .. } => {
-            for p in sync::sync(root)? {
+        Cmd::Sync { force, .. } => {
+            let changed = if force {
+                sync::sync_force(root)?
+            } else {
+                sync::sync(root)?
+            };
+            for p in changed {
                 println!("synced {p}");
             }
             Ok(false)

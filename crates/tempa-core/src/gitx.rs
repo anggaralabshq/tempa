@@ -135,3 +135,21 @@ pub fn get_config(root: &Path, key: &str) -> Option<String> {
 pub fn switch_new(root: &Path, branch: &str) -> Result<()> {
     git(root, &["switch", "-c", branch]).map(|_| ())
 }
+
+/// `git check-ignore`: true when `rel` is ignored (false outside a repo).
+pub fn is_ignored(root: &Path, rel: &str) -> bool {
+    git(root, &["check-ignore", "-q", "--", rel]).is_ok()
+}
+
+/// Paths under `paths` with unstaged edits or untracked (non-ignored) files.
+pub fn unstaged(root: &Path, paths: &[&str]) -> Result<Vec<String>> {
+    let mut args = vec!["diff", "--name-only", "-z", "--"];
+    args.extend(paths);
+    let mut out = names(&git(root, &args)?);
+    let mut args = vec!["ls-files", "--others", "--exclude-standard", "-z", "--"];
+    args.extend(paths);
+    out.extend(names(&git(root, &args)?));
+    out.sort();
+    out.dedup();
+    Ok(out)
+}

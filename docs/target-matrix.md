@@ -17,6 +17,7 @@ Dipakai oleh `tempa sync` (`crates/tempa-core/src/targets.rs`). Perbarui file in
 - Claude: `Edit(...)` mencakup semua tool penulis file (Write, MultiEdit). `/path` di project settings relatif ke root proyek; dipilih agar konsisten dengan glob `protected_paths` di CI yang juga relatif ke root.
 - Gemini CLI: untuk pengguna tier gratis/Google One, Gemini CLI diganti Antigravity CLI sejak 2026-06-18. Target ini tetap berlaku untuk pengguna Gemini CLI berbayar/enterprise; evaluasi ulang target Antigravity di luar M1.
 - Cursor commands: halaman docs commands mengarah ke Skills; Cursor menyediakan migrasi command → skill (`disable-model-invocation: true`). `.cursor/commands/` dipertahankan di M1; pindahkan ke skill bila Cursor berhenti membacanya.
+- MCP env/header: sumber memakai sintaks Claude `${VAR}`. OpenCode → `{env:VAR}`. Codex meneruskan `env` dan `http_headers` apa adanya: `KEY = "${KEY}"` → `env_vars = ["KEY"]`, header `"${VAR}"` → `env_http_headers`, `Authorization: "Bearer ${VAR}"` → `bearer_token_env_var`; bentuk lain (mis. `DB = "${DB_URL}"`, ganti nama) dilaporkan sebagai gap `mcp`. Cursor/Gemini: `${VAR}` diteruskan apa adanya (belum terverifikasi docs untuk Cursor).
 - Cursor membaca `AGENTS.md` menurut sumber pihak ketiga, tapi belum terkonfirmasi docs resmi; `.cursor/rules/tempa.mdc` tetap di-generate.
 
 ## Sumber

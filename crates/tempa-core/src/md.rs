@@ -27,6 +27,39 @@ fn unquote(v: &str) -> &str {
     v
 }
 
+/// Top-level `key: value` pairs; `>` / `|` block scalars are folded / joined.
+fn parse_pairs(raw: &str) -> Vec<(String, String)> {
+    let lines: Vec<&str> = raw.lines().collect();
+    let mut pairs = Vec::new();
+    let mut i = 0;
+    while i < lines.len() {
+        let l = lines[i];
+        i += 1;
+        if l.starts_with([' ', '\t', '#', '-']) {
+            continue;
+        }
+        let Some((k, v)) = l.split_once(':') else {
+            continue;
+        };
+        let v = v.trim();
+        let value = if matches!(v, ">" | ">-" | ">+" | "|" | "|-" | "|+") {
+            let mut block = Vec::new();
+            while i < lines.len()
+                && (lines[i].starts_with([' ', '\t']) || lines[i].trim().is_empty())
+            {
+                block.push(lines[i].trim());
+                i += 1;
+            }
+            let sep = if v.starts_with('>') { " " } else { "\n" };
+            block.join(sep).trim().to_string()
+        } else {
+            unquote(v).to_string()
+        };
+        pairs.push((k.trim().to_string(), value));
+    }
+    pairs
+}
+
 /// Split `md` into frontmatter (only when the first line is exactly `---`) and body.
 pub fn split_front(md: &str) -> (Option<Front>, &str) {
     let mut lines = md.split_inclusive('\n');
@@ -39,12 +72,7 @@ pub fn split_front(md: &str) -> (Option<Front>, &str) {
     for line in lines {
         offset += line.len();
         if is_delim(line) {
-            let pairs = raw
-                .lines()
-                .filter(|l| !l.starts_with([' ', '\t', '#', '-']))
-                .filter_map(|l| l.split_once(':'))
-                .map(|(k, v)| (k.trim().to_string(), unquote(v).to_string()))
-                .collect();
+            let pairs = parse_pairs(&raw);
             return (Some(Front { raw, pairs }), &md[offset..]);
         }
         raw.push_str(&normalize_eol(line));

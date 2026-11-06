@@ -24,7 +24,7 @@ pub struct OutFile {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Gap {
     pub agent: Agent,
-    /// "commands" | "agents" | "skills" | "settings-deny"
+    /// "commands" | "agents" | "skills" | "settings-deny" | "mcp"
     pub kind: &'static str,
     pub name: String,
 }
@@ -78,7 +78,50 @@ fn with_header(front_raw: Option<&str>, body: &str) -> String {
 
 /// Frontmatter built from chosen pairs only.
 fn front_of(pairs: &[(&str, &str)]) -> String {
-    pairs.iter().map(|(k, v)| format!("{k}: {v}\n")).collect()
+    pairs
+        .iter()
+        .map(|(k, v)| format!("{k}: {}\n", yaml_scalar(v)))
+        .collect()
+}
+
+/// Plain YAML scalar when safe, else a JSON-quoted string (valid YAML).
+fn yaml_scalar(v: &str) -> String {
+    let unsafe_plain = v.is_empty()
+        || v != v.trim()
+        || v.contains(": ")
+        || v.contains(" #")
+        || v.contains('\n')
+        || v.ends_with(':')
+        || v.starts_with([
+            '!', '&', '*', '-', '?', '{', '}', '[', ']', ',', '#', '|', '>', '@', '`', '"', '\'',
+            '%',
+        ]);
+    if unsafe_plain {
+        serde_json::to_string(v).expect("string serializes")
+    } else {
+        v.to_string()
+    }
+}
+
+/// `${VAR}` (Claude/Cursor/Gemini syntax) → OpenCode `{env:VAR}`.
+fn opencode_env(v: &str) -> String {
+    let mut out = String::new();
+    let mut rest = v;
+    while let Some(i) = rest.find("${") {
+        let Some(j) = rest[i..].find('}') else { break };
+        out.push_str(&rest[..i]);
+        out.push_str(&format!("{{env:{}}}", &rest[i + 2..i + j]));
+        rest = &rest[i + j + 1..];
+    }
+    out + rest
+}
+
+fn opencode_map(m: &std::collections::BTreeMap<String, String>) -> Value {
+    Value::Object(
+        m.iter()
+            .map(|(k, v)| (k.clone(), json!(opencode_env(v))))
+            .collect(),
+    )
 }
 
 fn item_raw(item: &Item) -> String {
@@ -105,7 +148,11 @@ fn pretty(v: &Map<String, Value>) -> String {
 /// `{command,args,env}` or the agent's remote shape.
 fn mcp_json(s: &McpServer, remote: impl Fn(&str) -> Value) -> Value {
     if let Some(url) = &s.url {
-        return remote(url);
+        let mut v = remote(url);
+        if !s.headers.is_empty() {
+            v["headers"] = json!(s.headers);
+        }
+        return v;
     }
     let mut m = Map::new();
     m.insert(
@@ -184,6 +231,64 @@ fn toml_multiline(s: &str) -> String {
     )
 }
 
+/// `${NAME}` → `NAME`.
+fn env_ref(v: &str) -> Option<&str> {
+    v.strip_prefix("${")
+        .and_then(|r| r.strip_suffix('}'))
+        .filter(|n| !n.is_empty() && !n.contains(['$', '{', '}']))
+}
+
+/// Codex `[mcp_servers.x]` entries for env/headers. Codex passes `env` and
+/// `http_headers` literally, forwards host vars by the same name (`env_vars`), reads
+/// header values from named vars (`env_http_headers`) and a bearer token from
+/// `bearer_token_env_var`. Anything else with `${..}` cannot be expressed → gap.
+fn codex_mcp(out: &mut Out, name: &str, s: &McpServer, t: &mut toml_edit::Table) {
+    let (mut env, mut fwd) = (toml_edit::InlineTable::new(), toml_edit::Array::new());
+    for (k, v) in &s.env {
+        match env_ref(v) {
+            Some(n) if n == k => fwd.push(n),
+            _ if v.contains("${") => out.gap(
+                "mcp",
+                &format!("{name}: env {k}={v} (Codex tidak bisa mengganti nama variabel)"),
+            ),
+            _ => {
+                env.insert(k, v.as_str().into());
+            }
+        }
+    }
+    let (mut hdr, mut env_hdr) = (toml_edit::InlineTable::new(), toml_edit::InlineTable::new());
+    for (k, v) in &s.headers {
+        if let Some(n) = env_ref(v) {
+            env_hdr.insert(k, n.into());
+        } else if let Some(n) = v
+            .strip_prefix("Bearer ")
+            .and_then(env_ref)
+            .filter(|_| k.eq_ignore_ascii_case("authorization"))
+        {
+            t.insert("bearer_token_env_var", toml_edit::value(n));
+        } else if v.contains("${") {
+            out.gap(
+                "mcp",
+                &format!("{name}: header {k} (format nilai tidak didukung Codex)"),
+            );
+        } else {
+            hdr.insert(k, v.as_str().into());
+        }
+    }
+    for (key, table) in [
+        ("env", env),
+        ("http_headers", hdr),
+        ("env_http_headers", env_hdr),
+    ] {
+        if !table.is_empty() {
+            t.insert(key, toml_edit::value(table));
+        }
+    }
+    if !fwd.is_empty() {
+        t.insert("env_vars", toml_edit::value(fwd));
+    }
+}
+
 fn codex_config(out: &mut Out, src: &Source) {
     let path = ".codex/config.toml";
     if src.mcp.is_empty() && !src.bases.contains_key(path) {
@@ -212,14 +317,8 @@ fn codex_config(out: &mut Out, src: &Source) {
                         toml_edit::value(s.args.iter().collect::<toml_edit::Array>()),
                     );
                 }
-                if !s.env.is_empty() {
-                    let mut env = toml_edit::InlineTable::new();
-                    for (k, v) in &s.env {
-                        env.insert(k, v.into());
-                    }
-                    t.insert("env", toml_edit::value(env));
-                }
             }
+            codex_mcp(out, name, s, &mut t);
             servers.insert(name, toml_edit::Item::Table(t));
         }
         doc.insert("mcp_servers", toml_edit::Item::Table(servers));
@@ -364,13 +463,19 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                         .iter()
                         .map(|(n, s)| {
                             let val = match &s.url {
-                                Some(u) => json!({"type":"remote","url":u}),
+                                Some(u) => {
+                                    let mut m = json!({"type":"remote","url":u});
+                                    if !s.headers.is_empty() {
+                                        m["headers"] = opencode_map(&s.headers);
+                                    }
+                                    m
+                                }
                                 None => {
                                     let mut cmd = vec![s.command.clone().unwrap_or_default()];
                                     cmd.extend(s.args.iter().cloned());
                                     let mut m = json!({"type":"local","command":cmd});
                                     if !s.env.is_empty() {
-                                        m["environment"] = json!(s.env);
+                                        m["environment"] = opencode_map(&s.env);
                                     }
                                     m
                                 }

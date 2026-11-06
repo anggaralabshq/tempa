@@ -131,7 +131,11 @@ fn fix_applies_stale_but_blocks_direct_edit() {
     std::fs::write(d.path().join("CLAUDE.md"), &edited).unwrap();
     let (changed, blockers) = sync_fix(d.path()).unwrap();
     assert!(changed.is_empty());
-    assert_eq!(blockers, vec![Drift::Modified("CLAUDE.md".into())]);
+    assert_eq!(blockers.len(), 1);
+    assert_eq!(
+        (blockers[0].code, blockers[0].path.as_deref()),
+        ("drift.modified", Some("CLAUDE.md"))
+    );
     assert_eq!(read(d.path(), "CLAUDE.md"), edited);
 }
 

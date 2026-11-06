@@ -3,6 +3,7 @@ use common::{fixture_repo, read, write};
 use tempa_core::config::Config;
 use tempa_core::import::import;
 use tempa_core::sync::{drift, sync};
+use tempa_core::targets::HEADER_MD;
 
 #[test]
 fn imports_claude_heavy() {
@@ -47,10 +48,12 @@ fn imports_claude_heavy() {
     ] {
         assert!(d.path().join(p).exists(), "{p}");
     }
+    // import --yes also syncs: the source keeps the original, the target gets the header.
     assert_eq!(
         read(d.path(), ".tempa/commands/db/migrate.md"),
-        read(d.path(), ".claude/commands/db/migrate.md")
+        "---\ndescription: Buat migrasi\n---\nBuat migrasi untuk $ARGUMENTS\n"
     );
+    assert!(read(d.path(), ".claude/commands/db/migrate.md").contains(HEADER_MD));
     assert!(read(d.path(), ".tempa/mcp.toml").contains("[servers.pg]"));
     let cfg = Config::load(d.path()).unwrap();
     assert!(

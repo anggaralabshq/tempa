@@ -85,9 +85,27 @@ pub fn init(root: &Path) -> Result<Vec<String>> {
         )?;
     }
 
-    if gitx::is_repo(root) && gitx::get_config(root, "core.hooksPath").as_deref() != Some(HOOKS_DIR)
-    {
+    // Never replace another hook manager (husky, lefthook): the CLI warns instead.
+    if gitx::is_repo(root) && gitx::get_config(root, "core.hooksPath").is_none() {
         gitx::set_config(root, "core.hooksPath", HOOKS_DIR)?;
     }
     Ok(created)
+}
+
+/// Agent context that `tempa import` should absorb instead of `tempa init`
+/// overwriting it with templates and generated targets.
+pub fn existing_agent_context(root: &Path) -> Option<&'static str> {
+    if root.join(config::FILE).exists() {
+        return None;
+    }
+    [
+        "CLAUDE.md",
+        ".claude",
+        "GEMINI.md",
+        ".cursorrules",
+        ".cursor/rules",
+        ".github/copilot-instructions.md",
+    ]
+    .into_iter()
+    .find(|p| root.join(p).exists())
 }

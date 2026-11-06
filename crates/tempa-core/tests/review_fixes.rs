@@ -58,7 +58,7 @@ fn import_keeps_keys_of_existing_agent_configs() {
     import(d.path(), true).unwrap();
     let oc = read(d.path(), "opencode.json");
     assert!(
-        oc.contains("\"edit\": \"ask\"") && oc.contains("$schema") && oc.contains("\"mcp\""),
+        oc.contains("\"*\": \"ask\"") && oc.contains("$schema") && oc.contains("\"mcp\""),
         "{oc}"
     );
     let gm = read(d.path(), ".gemini/settings.json");

@@ -205,7 +205,9 @@ fn no_mcp_means_no_mcp_files() {
     assert!(!has(&render(Agent::Claude, &c, &src), ".mcp.json"));
     assert!(!has(&render(Agent::Cursor, &c, &src), ".cursor/mcp.json"));
     assert!(!has(&render(Agent::Codex, &c, &src), ".codex/config.toml"));
-    assert!(!has(&render(Agent::Opencode, &c, &src), "opencode.json"));
+    // opencode.json still carries the edit deny list.
+    let oc = json_of(&render(Agent::Opencode, &c, &src), "opencode.json");
+    assert!(oc.get("mcp").is_none());
     let g = json_of(&render(Agent::Gemini, &c, &src), ".gemini/settings.json");
     assert!(g.get("mcpServers").is_none());
 }
@@ -328,7 +330,9 @@ fn cursor_agents_only_when_claude_is_off() {
     let ru = render(Agent::Cursor, &c, &canon());
     assert!(!has(&ru, ".cursor/agents/tester.md"));
     assert!(ru.gaps.iter().all(|g| g.kind != "agents"));
-    c.agents.enabled.retain(|a| *a != Agent::Claude);
+    c.agents
+        .enabled
+        .retain(|a| !matches!(a, Agent::Claude | Agent::Codex));
     let ru = render(Agent::Cursor, &c, &canon());
     assert_eq!(
         text(&ru, ".cursor/agents/tester.md"),
@@ -359,12 +363,56 @@ fn cursor_cli_denies_protected_paths() {
 fn gaps_reported_never_silent() {
     let r = render(Agent::Codex, &cfg(), &canon());
     let kinds: BTreeSet<_> = r.gaps.iter().map(|g| g.kind).collect();
-    assert_eq!(
-        kinds,
-        BTreeSet::from(["commands", "agents", "settings-deny", "mcp"])
-    );
+    assert_eq!(kinds, BTreeSet::from(["commands", "settings-deny", "mcp"]));
     assert!(has(&r, ".agents/skills/adr/SKILL.md"));
     assert_eq!(r.gaps.iter().filter(|g| g.kind == "commands").count(), 3);
     let cursor = render(Agent::Cursor, &cfg(), &canon());
     assert!(cursor.gaps.is_empty(), "{:?}", cursor.gaps);
+}
+
+#[test]
+fn codex_subagents_are_toml() {
+    // learn.chatgpt.com/docs/agent-configuration/subagents: name, description, developer_instructions.
+    let r = render(Agent::Codex, &cfg(), &canon());
+    let t: toml::Table = toml::from_str(&text(&r, ".codex/agents/tester.toml")).unwrap();
+    assert_eq!(t["name"].as_str(), Some("tester"));
+    assert_eq!(t["description"].as_str(), Some("Menulis test"));
+    assert_eq!(
+        t["developer_instructions"].as_str(),
+        Some("Kamu menulis test.\n")
+    );
+    assert!(r.gaps.iter().all(|g| g.kind != "agents"));
+}
+
+#[test]
+fn cursor_agents_skip_when_codex_writes_them() {
+    let mut c = cfg();
+    c.agents.enabled = vec![Agent::Codex, Agent::Cursor];
+    assert!(!has(
+        &render(Agent::Cursor, &c, &canon()),
+        ".cursor/agents/tester.md"
+    ));
+}
+
+#[test]
+fn opencode_denies_protected_edits() {
+    let mut src = canon();
+    src.bases.insert(
+        "opencode.json".into(),
+        br#"{"permission":{"bash":"ask","edit":"ask"}}"#.to_vec(),
+    );
+    let v = json_of(&render(Agent::Opencode, &cfg(), &src), "opencode.json");
+    assert_eq!(v["permission"]["bash"], "ask");
+    assert_eq!(
+        v["permission"]["edit"],
+        json!({"*": "ask", ".env*": "deny", "tempa.toml": "deny"})
+    );
+    let mut bare = canon();
+    bare.mcp.clear();
+    let r = render(Agent::Opencode, &cfg(), &bare);
+    assert_eq!(
+        json_of(&r, "opencode.json")["permission"]["edit"],
+        json!({"*": "allow", ".env*": "deny", "tempa.toml": "deny"})
+    );
+    assert!(r.gaps.iter().all(|g| g.kind != "settings-deny"));
 }

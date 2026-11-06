@@ -3,13 +3,14 @@
 
 use notify::{RecursiveMode, Watcher};
 use serde::Serialize;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tempa_core::config::Config;
 use tempa_core::sync;
 
 const QUIET: Duration = Duration::from_millis(300);
+const CAP: Duration = Duration::from_secs(2);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
@@ -40,15 +41,26 @@ pub fn classify(rel: &str, context: &str) -> Kind {
     }
 }
 
-/// `first` plus everything that arrives until the channel stays quiet for `quiet`.
-pub fn burst<T>(rx: &Receiver<T>, first: T, quiet: Duration) -> Vec<T> {
+/// `first` plus everything that arrives until the channel stays quiet for `quiet`,
+/// or `cap` has passed (a process writing nonstop must not hold a sync back forever).
+pub fn burst<T>(rx: &Receiver<T>, first: T, quiet: Duration, cap: Duration) -> Vec<T> {
+    let end = Instant::now() + cap;
     let mut all = vec![first];
     loop {
-        match rx.recv_timeout(quiet) {
+        let left = end.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return all;
+        }
+        match rx.recv_timeout(quiet.min(left)) {
             Ok(x) => all.push(x),
             Err(RecvTimeoutError::Timeout | RecvTimeoutError::Disconnected) => return all,
         }
     }
+}
+
+/// Reads are not changes (inotify reports opens: the sync reading AGENTS.md would loop).
+pub fn changes(kind: &notify::EventKind) -> bool {
+    !matches!(kind, notify::EventKind::Access(_))
 }
 
 #[derive(Debug, Clone, Default, Serialize)]
@@ -68,10 +80,29 @@ pub struct Watch(#[allow(dead_code)] notify::RecommendedWatcher);
 pub fn watch(root: &Path, on: impl Fn(Update) + Send + 'static) -> Result<Watch, String> {
     // FSEvents reports canonical paths (/private/var/... on macOS).
     let root = root.canonicalize().map_err(|e| e.to_string())?;
-    let (tx, rx) = mpsc::channel::<Vec<PathBuf>>();
+    let (tx, rx) = mpsc::channel::<Vec<String>>();
+    let base = root.clone();
+    // Filter here, not after the burst: ignored dirs (a busy target/) never reach the debounce.
     let mut w = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
-        if let Ok(e) = res {
-            let _ = tx.send(e.paths);
+        let Ok(e) = res else { return };
+        if !changes(&e.kind) {
+            return;
+        }
+        let rels: Vec<String> = e
+            .paths
+            .iter()
+            .filter_map(|p| {
+                Some(
+                    p.strip_prefix(&base)
+                        .ok()?
+                        .to_string_lossy()
+                        .replace('\\', "/"),
+                )
+            })
+            .filter(|rel| classify(rel, "") != Kind::Ignore)
+            .collect();
+        if !rels.is_empty() {
+            let _ = tx.send(rels);
         }
     })
     .map_err(|e| e.to_string())?;
@@ -83,17 +114,10 @@ pub fn watch(root: &Path, on: impl Fn(Update) + Send + 'static) -> Result<Watch,
             let context = Config::load(&root)
                 .map(|c| c.docs.context)
                 .unwrap_or_else(|_| "AGENTS.md".into());
-            let kinds: Vec<Kind> = burst(&rx, first, QUIET)
-                .into_iter()
+            let kinds: Vec<Kind> = burst(&rx, first, QUIET, CAP)
+                .iter()
                 .flatten()
-                .filter_map(|p| {
-                    let rel = p
-                        .strip_prefix(&root)
-                        .ok()?
-                        .to_string_lossy()
-                        .replace('\\', "/");
-                    Some(classify(&rel, &context))
-                })
+                .map(|rel| classify(rel, &context))
                 .collect();
             let mut u = Update {
                 root: root.display().to_string(),
@@ -173,10 +197,91 @@ mod tests {
         });
         let first = rx.recv().unwrap();
         assert_eq!(
-            burst(&rx, first, Duration::from_millis(200)),
+            burst(
+                &rx,
+                first,
+                Duration::from_millis(200),
+                Duration::from_secs(2)
+            ),
             (0..10).collect::<Vec<_>>()
         );
         assert_eq!(rx.recv().unwrap(), 99);
+    }
+
+    #[test]
+    fn burst_ends_at_the_cap_under_constant_events() {
+        let (tx, rx) = mpsc::channel();
+        std::thread::spawn(move || {
+            for i in 0..200 {
+                if tx.send(i).is_err() {
+                    return;
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+        });
+        let first = rx.recv().unwrap();
+        let t = std::time::Instant::now();
+        burst(
+            &rx,
+            first,
+            Duration::from_millis(300),
+            Duration::from_millis(500),
+        );
+        assert!(
+            t.elapsed() < Duration::from_millis(900),
+            "{:?}",
+            t.elapsed()
+        );
+    }
+
+    #[test]
+    fn reads_are_not_changes() {
+        use notify::event::{AccessKind, AccessMode, CreateKind, EventKind, ModifyKind};
+        assert!(!changes(&EventKind::Access(AccessKind::Open(
+            AccessMode::Read
+        ))));
+        assert!(!changes(&EventKind::Access(AccessKind::Close(
+            AccessMode::Write
+        ))));
+        assert!(changes(&EventKind::Modify(ModifyKind::Any)));
+        assert!(changes(&EventKind::Create(CreateKind::File)));
+    }
+
+    #[test]
+    fn source_edit_syncs_while_ignored_dirs_are_busy() {
+        let d = adopted();
+        let (tx, rx) = mpsc::channel();
+        let _w = watch(d.path(), move |u| {
+            let _ = tx.send(u);
+        })
+        .unwrap();
+        // A build writing into target/ every 50 ms, for longer than the test waits.
+        let busy = d.path().join("target");
+        std::fs::create_dir_all(&busy).unwrap();
+        let stop = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let s2 = stop.clone();
+        let h = std::thread::spawn(move || {
+            let mut i = 0u32;
+            while !s2.load(std::sync::atomic::Ordering::Relaxed) {
+                std::fs::write(busy.join("out"), i.to_string()).unwrap();
+                i += 1;
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        });
+        std::thread::sleep(Duration::from_millis(300));
+        std::fs::write(
+            d.path().join(".tempa/commands/review.md"),
+            "---\ndescription: R\n---\nv2\n",
+        )
+        .unwrap();
+        let got = rx.recv_timeout(Duration::from_secs(3));
+        stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        h.join().unwrap();
+        let u = got.expect("sync within 3 s despite a busy target/");
+        assert!(
+            u.synced.iter().any(|p| p == ".claude/commands/review.md"),
+            "{u:?}"
+        );
     }
 
     fn git(dir: &std::path::Path, args: &[&str]) {

@@ -80,6 +80,19 @@ impl Finding {
     }
 }
 
+/// `Command::new(program)` that opens no console window on Windows (the desktop app
+/// has no console, so each git call would otherwise flash one).
+pub fn command(program: &str) -> std::process::Command {
+    #[allow(unused_mut)]
+    let mut c = std::process::Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        c.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    c
+}
+
 /// Write via `<path>.tempa-tmp` + rename so a crash never leaves a half file.
 pub fn write_atomic(path: &std::path::Path, bytes: &[u8]) -> Result<()> {
     if let Some(parent) = path.parent() {

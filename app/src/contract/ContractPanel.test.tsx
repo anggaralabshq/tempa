@@ -37,5 +37,15 @@ test("discard lists the affected files and runs only after confirmation", async 
   await screen.findByText(/overwrite these files/i);
   expect(vi.mocked(invoke)).not.toHaveBeenCalledWith("contract_run", expect.anything());
   fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
-  await waitFor(() => expect(vi.mocked(invoke)).toHaveBeenCalledWith("contract_run", { root: "/r", action: "discard" }));
+  await waitFor(() =>
+    expect(vi.mocked(invoke)).toHaveBeenCalledWith("contract_run", { root: "/r", action: "discard", reviewed: ["CLAUDE.md"] }),
+  );
+});
+
+test("a missing folder shows the error and offers no action", async () => {
+  const gone = { ...status, has_config: false, offer: null, findings: [], drift: [], agents: [], error: "Folder not found: /r." };
+  vi.mocked(invoke).mockImplementationOnce(async () => gone);
+  render(<ContractPanel root="/r" />);
+  await screen.findByText(/Folder not found/);
+  expect(screen.queryByRole("button", { name: /Set up tempa|Import agent files/ })).toBeNull();
 });

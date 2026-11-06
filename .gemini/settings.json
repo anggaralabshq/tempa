@@ -3,5 +3,13 @@
     "fileName": [
       "AGENTS.md"
     ]
+  },
+  "mcpServers": {
+    "tempa": {
+      "args": [
+        "mcp"
+      ],
+      "command": "tempa"
+    }
   }
 }

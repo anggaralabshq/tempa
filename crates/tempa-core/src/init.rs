@@ -7,6 +7,7 @@ use std::path::Path;
 const PRE_COMMIT: &str = include_str!("templates/pre-commit");
 const PRE_PUSH: &str = include_str!("templates/pre-push");
 const DEVOPS: &str = include_str!("templates/devops.md");
+const MCP_LINE: &str = "Agents: use the tempa_* MCP tools (tempa_context, tempa_plan, tempa_log_change, tempa_check) for plans, decisions, changes and checks.";
 pub const HOOKS_DIR: &str = ".tempa/hooks";
 
 fn heading_doc(title: Option<&str>, headings: &[String]) -> String {
@@ -41,7 +42,11 @@ pub fn init(root: &Path) -> Result<Vec<String>> {
     let d = &cfg.docs;
     create(
         &d.context,
-        &heading_doc(Some(&cfg.project.name), &cfg.headings.context),
+        &heading_doc(Some(&cfg.project.name), &cfg.headings.context).replacen(
+            "\n\n",
+            &format!("\n\n{MCP_LINE}\n\n"),
+            1,
+        ),
     )?;
     create(
         &d.harness,

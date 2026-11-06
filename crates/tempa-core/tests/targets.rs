@@ -200,7 +200,8 @@ fn remote_mcp_shapes() {
 fn no_mcp_means_no_mcp_files() {
     let mut src = canon();
     src.mcp.clear();
-    let c = cfg();
+    let mut c = cfg();
+    c.mcp.serve = false;
     assert!(!has(&render(Agent::Claude, &c, &src), ".mcp.json"));
     assert!(!has(&render(Agent::Cursor, &c, &src), ".cursor/mcp.json"));
     assert!(!has(&render(Agent::Codex, &c, &src), ".codex/config.toml"));

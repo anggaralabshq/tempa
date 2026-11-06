@@ -43,11 +43,11 @@ pub fn doctor(root: &Path) -> Result<DoctorReport> {
                 agent,
                 files: r.files.len(),
                 gaps: r.gaps,
-                // ponytail: only Claude has a project-level deny list today (docs/target-matrix.md).
-                protected: if agent == Agent::Claude {
-                    "settings deny"
-                } else {
-                    "gap (CI)"
+                // Per docs/target-matrix.md (settings-deny row).
+                protected: match agent {
+                    Agent::Claude => "settings deny",
+                    Agent::Cursor => "cli deny (IDE: CI)",
+                    _ => "gap (CI)",
                 },
                 lifecycle: if cfg.mcp.serve || src.mcp.contains_key(TEMPA_SERVER) {
                     "mcp"

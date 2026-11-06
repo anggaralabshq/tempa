@@ -21,6 +21,8 @@ fn doctor_after_import() {
         3
     );
     assert_eq!(codex.protected, "gap (CI)");
+    let cursor = r.rows.iter().find(|x| x.agent == Agent::Cursor).unwrap();
+    assert_eq!(cursor.protected, "cli deny (IDE: CI)");
     assert_eq!(codex.lifecycle, "mcp");
     assert!(
         r.legacy.contains(&".cursorrules".to_string()),

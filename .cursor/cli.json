@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "deny": [
+      "Write(.env*)",
+      "Write(.github/workflows/**)",
+      "Write(tempa.toml)"
+    ]
+  }
+}

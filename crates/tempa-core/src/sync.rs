@@ -114,7 +114,13 @@ pub fn drift(root: &Path) -> Result<Vec<Drift>> {
     for dir in dirs {
         for (rel, _) in source::walk(&root.join(dir))? {
             let path = format!("{dir}/{rel}");
-            if !expected.contains(&path) && !path.ends_with(".tempa-tmp") {
+            if expected.contains(&path) || path.ends_with(".tempa-tmp") {
+                continue;
+            }
+            // An unchanged output whose source was removed: `tempa sync` deletes it.
+            if lock.files.get(&path).is_some_and(|h| disk_hash(root, &path).as_ref() == Some(h)) {
+                out.push(Drift::Stale(path));
+            } else {
                 out.push(Drift::Untracked(path));
             }
         }

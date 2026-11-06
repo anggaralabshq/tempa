@@ -113,3 +113,16 @@ fn preexisting_handwritten_target_is_modified() {
     write(d.path(), "CLAUDE.md", "tulisan tangan\n");
     assert!(drift(d.path()).unwrap().contains(&Drift::Modified("CLAUDE.md".into())));
 }
+
+#[test]
+fn orphan_from_removed_source_is_stale_not_untracked() {
+    let d = canon_repo();
+    sync(d.path()).unwrap();
+    std::fs::remove_file(d.path().join(".tempa/commands/review.md")).unwrap();
+    let d2 = drift(d.path()).unwrap();
+    assert!(d2.contains(&Drift::Stale(".claude/commands/review.md".into())), "{d2:?}");
+    assert!(!d2.iter().any(|x| matches!(x, Drift::Untracked(_))), "{d2:?}");
+    let (changed, blockers) = sync_fix(d.path()).unwrap();
+    assert!(blockers.is_empty());
+    assert!(changed.contains(&".claude/commands/review.md".to_string()));
+}

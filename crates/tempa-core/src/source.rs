@@ -28,9 +28,13 @@ pub struct Skill {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, serde::Serialize)]
 #[serde(default)]
 pub struct McpServer {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub command: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
     pub args: Vec<String>,
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
     pub env: BTreeMap<String, String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
 }
 
@@ -47,10 +51,10 @@ pub struct Source {
     pub bases: BTreeMap<String, Vec<u8>>,
 }
 
-#[derive(Deserialize, Default)]
-struct McpFile {
+#[derive(Deserialize, serde::Serialize, Default)]
+pub struct McpFile {
     #[serde(default)]
-    servers: BTreeMap<String, McpServer>,
+    pub servers: BTreeMap<String, McpServer>,
 }
 
 pub fn parse_item(rel: String, text: &str) -> Item {

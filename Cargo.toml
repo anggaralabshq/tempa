@@ -1,7 +1,6 @@
 [workspace]
 resolver = "3"
 members = ["crates/tempa-core", "crates/tempa-cli"]
-exclude = ["app/src-tauri"]
 
 [workspace.package]
 version = "0.1.0"

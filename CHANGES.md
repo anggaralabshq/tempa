@@ -236,3 +236,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-desktop-app-branch
+- Summary: Move the frozen desktop app to branch desktop-app; CI for the CLI
+- Reason: main becomes a CLI-only repo
+- Decision: docs/decisions/2026-11-06-desktop-app-to-branch.md
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

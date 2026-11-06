@@ -468,3 +468,42 @@ fn cursor_mcp_variables_round_trip() {
     let opencode: serde_json::Value = serde_json::from_str(&read(p, "opencode.json")).unwrap();
     assert_eq!(opencode["mcp"]["pg"]["environment"]["DB"], "{env:DB_URL}");
 }
+
+// m4 review: hand-written files in the new tempa-owned dirs are absorbed, not stuck as drift.
+#[test]
+fn import_absorbs_copilot_and_codex_agent_dirs() {
+    let d = valid_repo();
+    let p = d.path();
+    write(
+        p,
+        ".github/agents/rev.agent.md",
+        "---\nname: rev\ndescription: Reviews\n---\nReview it.\n",
+    );
+    write(
+        p,
+        ".codex/agents/sec.toml",
+        "name = \"sec\"\ndescription = \"Security: audits\"\ndeveloper_instructions = \"\"\"\nAudit it.\n\"\"\"\n",
+    );
+    let r = tempa_core::import::import(p, true).unwrap();
+    assert!(r.gaps.is_empty(), "{:?}", r.gaps);
+    assert!(read(p, ".tempa/agents/rev.md").contains("Review it."));
+    let sec = read(p, ".tempa/agents/sec.md");
+    assert_eq!(
+        sec,
+        "---\nname: sec\ndescription: \"Security: audits\"\n---\nAudit it.\n"
+    );
+    assert!(drift(p).unwrap().is_empty(), "{:?}", drift(p).unwrap());
+}
+
+// A skill in .github/skills is not absorbed (its target is .agents/skills); the
+// finding says where it goes.
+#[test]
+fn copilot_skill_dir_drift_names_the_skill_source() {
+    let d = valid_repo();
+    let p = d.path();
+    sync(p).unwrap();
+    write(p, ".github/skills/lint/SKILL.md", "Lint it.\n");
+    let f = drift_findings(&drift(p).unwrap());
+    assert_eq!(f.len(), 1, "{f:?}");
+    assert!(f[0].message.contains(".tempa/skills/"), "{}", f[0].message);
+}

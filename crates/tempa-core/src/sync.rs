@@ -121,7 +121,7 @@ pub fn sync_force(root: &Path) -> Result<Vec<String>> {
 }
 
 /// Target dirs `tempa import` can absorb new files from: (dir, `.tempa/<kind>`).
-pub const ITEM_DIRS: [(&str, &str); 9] = [
+pub const ITEM_DIRS: [(&str, &str); 11] = [
     (".claude/commands", "commands"),
     (".claude/agents", "agents"),
     (".claude/skills", "skills"),
@@ -131,6 +131,8 @@ pub const ITEM_DIRS: [(&str, &str); 9] = [
     (".cursor/commands", "commands"),
     (".cursor/agents", "agents"),
     (".gemini/agents", "agents"),
+    (".github/agents", "agents"),
+    (".codex/agents", "agents"),
 ];
 
 /// Shared config targets whose non-tempa keys `tempa import` keeps as a base.
@@ -243,6 +245,11 @@ pub fn drift_findings(d: &[Drift]) -> Vec<Finding> {
                 "drift.untracked",
                 Some(p.clone()),
                 "new file in a tempa-owned directory; run tempa import --yes to absorb",
+            ),
+            Drift::Untracked(p) if p.starts_with(".github/skills/") => Finding::error(
+                "drift.untracked",
+                Some(p.clone()),
+                "new file in a tempa-owned directory; move the skill to .tempa/skills/<name>/ (tempa writes skills to .agents/skills/, which Copilot reads), then delete this file",
             ),
             Drift::Untracked(p) => Finding::error(
                 "drift.untracked",

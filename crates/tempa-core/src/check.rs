@@ -234,9 +234,35 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
 }
 
 /// Run `[harness]` commands in order; stop at the first failure.
+/// Repository-local variables git exports to hooks (`git rev-parse --local-env-vars`).
+/// Harness commands run against `root`; inherited, these would point any git call in
+/// them (e.g. a test suite creating temp repos) at the repository being pushed.
+const GIT_LOCAL_ENV: [&str; 16] = [
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_CONFIG",
+    "GIT_CONFIG_PARAMETERS",
+    "GIT_CONFIG_COUNT",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_IMPLICIT_WORK_TREE",
+    "GIT_GRAFT_FILE",
+    "GIT_INDEX_FILE",
+    "GIT_NO_REPLACE_OBJECTS",
+    "GIT_REPLACE_REF_BASE",
+    "GIT_PREFIX",
+    "GIT_INTERNAL_SUPER_PREFIX",
+    "GIT_SHALLOW_FILE",
+    "GIT_COMMON_DIR",
+];
+
 pub fn run_harness(root: &Path, cfg: &Config) -> Result<Vec<Finding>> {
     for (name, cmd) in &cfg.harness {
-        let out = shell(cmd)
+        let mut c = shell(cmd);
+        for v in GIT_LOCAL_ENV {
+            c.env_remove(v);
+        }
+        let out = c
             .current_dir(root)
             .output()
             .map_err(|e| Error(format!("harness {name} could not run: {e}")))?;

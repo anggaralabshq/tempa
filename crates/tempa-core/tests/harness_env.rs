@@ -7,6 +7,7 @@ use tempa_core::config::Config;
 /// Git exports GIT_DIR (and in pre-commit GIT_INDEX_FILE) to hooks, notably from a
 /// worktree. A harness command that runs git in another repo, like a test suite
 /// creating temp repos, must not inherit them, or it writes into the pushing repo.
+#[cfg(unix)] // the harness command is sh syntax
 #[test]
 fn harness_commands_do_not_inherit_the_hooks_git_environment() {
     let hook_repo = valid_repo();

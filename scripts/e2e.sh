@@ -6,7 +6,8 @@ set -euo pipefail
 BIN=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")
 FIXTURE=$(cd "$(dirname "$0")/.." && pwd)/crates/tempa-core/tests/fixtures/claude-heavy
 WORK=$(mktemp -d)
-trap 'rm -rf "$WORK"' EXIT
+OUTSIDE=$(mktemp -d)   # origin and the second clone live outside the repo under test
+trap 'rm -rf "$WORK" "$OUTSIDE"' EXIT
 export PATH="$(dirname "$BIN"):$PATH"   # hooks call `tempa` from PATH
 export GIT_AUTHOR_NAME=e2e GIT_AUTHOR_EMAIL=e2e@x GIT_COMMITTER_NAME=e2e GIT_COMMITTER_EMAIL=e2e@x
 unset BITBUCKET_BRANCH BITBUCKET_PR_ID || true
@@ -84,13 +85,13 @@ echo "$OUT" | grep -q "^codex" || fail "doctor lacks the codex row:\n$OUT"
 
 echo "== step 8: two clones, lock committed, edits kept"
 git checkout -q main && git merge -q --no-edit "$(git rev-parse --abbrev-ref @{-1})"
-git init -q --bare "$WORK/origin.git" && git push -q --no-verify "$WORK/origin.git" main
-git clone -q "$WORK/origin.git" "$WORK/B" && (cd "$WORK/B" && git config core.hooksPath .tempa/hooks)
+git init -q --bare -b main "$OUTSIDE/origin.git" && git push -q --no-verify "$OUTSIDE/origin.git" main
+git clone -q "$OUTSIDE/origin.git" "$OUTSIDE/B" && (cd "$OUTSIDE/B" && git config core.hooksPath .tempa/hooks)
 printf -- '---\ndescription: R\n---\nreview version A\n' > ".tempa/commands/review.md"
 git add -A && git commit -qm "A changes review"
 [ -z "$(git status --porcelain)" ] || fail "lock/targets not committed:\n$(git status --porcelain)"
-git push -q --no-verify "$WORK/origin.git" main
-cd "$WORK/B" && git pull -q origin main
+git push -q --no-verify "$OUTSIDE/origin.git" main
+cd "$OUTSIDE/B" && git pull -q origin main
 printf -- '---\ndescription: R\n---\nreview version A\n\nStep B.\n' > ".tempa/commands/review.md"
 git add -A
 expect_code 0 git commit -qm "B changes review"

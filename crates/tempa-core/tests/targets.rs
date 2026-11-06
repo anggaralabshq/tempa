@@ -416,3 +416,65 @@ fn opencode_denies_protected_edits() {
     );
     assert!(r.gaps.iter().all(|g| g.kind != "settings-deny"));
 }
+
+#[test]
+fn copilot_reads_agents_md_and_gets_skills_agents_mcp() {
+    // docs.github.com/en/copilot: AGENTS.md is read natively; commands become user-invoked
+    // skills in .github/skills; agents are .github/agents/*.agent.md; MCP in .github/mcp.json.
+    let mut src = canon();
+    src.mcp.insert(
+        "web".into(),
+        McpServer {
+            url: Some("https://m.example".into()),
+            ..Default::default()
+        },
+    );
+    let r = render(Agent::Copilot, &cfg(), &src);
+    assert!(!has(&r, ".github/copilot-instructions.md"));
+    assert_eq!(
+        text(&r, ".github/skills/db-migrate/SKILL.md"),
+        format!(
+            "---\nname: db-migrate\ndescription: Buat migrasi\ndisable-model-invocation: true\n---\n{HEADER_MD}\nBuat migrasi untuk (the text after the command)\n"
+        )
+    );
+    assert!(has(&r, ".github/skills/review-kode/SKILL.md"));
+    assert_eq!(
+        text(&r, ".github/agents/tester.agent.md"),
+        format!(
+            "---\nname: tester\ndescription: Menulis test\n---\n{HEADER_MD}\nKamu menulis test.\n"
+        )
+    );
+    assert!(has(&r, ".agents/skills/adr/SKILL.md"));
+    let m = json_of(&r, ".github/mcp.json");
+    assert_eq!(
+        m["mcpServers"]["pg"],
+        json!({"type":"local","command":"npx","args":["-y","x"],"env":{"DB":"${DB_URL}"},"tools":["*"]})
+    );
+    assert_eq!(
+        m["mcpServers"]["web"],
+        json!({"type":"http","url":"https://m.example","tools":["*"]})
+    );
+    let kinds: BTreeSet<_> = r.gaps.iter().map(|g| g.kind).collect();
+    assert_eq!(kinds, BTreeSet::from(["settings-deny"]));
+}
+
+#[test]
+fn copilot_command_named_like_a_skill_is_a_gap() {
+    let mut src = canon();
+    src.commands
+        .push(parse_item("adr.md".into(), "Tulis ADR.\n"));
+    let r = render(Agent::Copilot, &cfg(), &src);
+    assert!(
+        r.gaps
+            .iter()
+            .any(|g| g.kind == "commands" && g.name.starts_with("adr.md"))
+    );
+    assert!(!has(&r, ".github/skills/adr/SKILL.md"));
+}
+
+#[test]
+fn copilot_is_a_known_agent() {
+    let c = Config::parse(&default_toml("x").replace("\"cursor\"]", "\"cursor\", \"copilot\"]"))
+        .unwrap();
+    assert!(c.agents.enabled.contains(&Agent::Copilot));
+}

@@ -1,6 +1,6 @@
 # tempa
 
-CLI Rust yang menjaga satu kontrak konteks (AGENTS.md + `.tempa/` + `tempa.toml`) dan meng-generate file untuk Claude Code, Codex, Gemini CLI, OpenCode, dan Cursor.
+CLI Rust yang menjaga satu kontrak konteks (AGENTS.md + `.tempa/` + `tempa.toml`) dan meng-generate file untuk Claude Code, Codex, Gemini CLI, OpenCode, Cursor, dan GitHub Copilot.
 
 ## Stack
 

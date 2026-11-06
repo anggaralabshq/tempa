@@ -241,7 +241,7 @@ mod tests {
             "{:?}",
             s.drift
         );
-        assert_eq!(s.agents.len(), 5);
+        assert_eq!(s.agents.len(), 6);
         assert!(s.hooks_ok);
         let claude = d.path().join("CLAUDE.md");
         std::fs::write(

@@ -15,10 +15,11 @@ Make the app part of the repo's gate (owner approved writing these protected fil
 1. tempa.toml [harness]: app_check, app_test, app_rust.
 2. .github/workflows/app-windows.yml: cargo test for app/src-tauri on windows-latest, for PRs touching app/ or tempa-core.
 3. HARNESS.md gates updated.
+4. First Windows run failed (3 pty tests): ConPTY waits for an answer to its cursor-position request (xterm.js answers in the app; tests now answer it), and kill left the console open. kill now closes the pty, which ends the whole process tree on both platforms.
 
 ## File yang disentuh
 
-tempa.toml, .github/workflows/app-windows.yml, HARNESS.md.
+tempa.toml, .github/workflows/app-windows.yml, HARNESS.md, app/src-tauri/src/pty.rs.
 
 ## Risiko
 

@@ -179,3 +179,22 @@ fn full_cli_flow_passes_check() {
         "{f:?}"
     );
 }
+
+#[test]
+fn task_branch_checks_against_the_branch_it_started_from() {
+    let d = valid_repo();
+    git(d.path(), &["switch", "-q", "-c", "m4"]);
+    task_new(d.path(), "x").unwrap();
+    let cfg = tempa_core::config::Config::load(d.path()).unwrap();
+    assert_eq!(tempa_core::gitx::base_name(d.path(), &cfg, None), "m4");
+    // An explicit base still wins; a branch tempa did not create falls back to [ci].base.
+    assert_eq!(
+        tempa_core::gitx::base_name(d.path(), &cfg, Some("main")),
+        "main"
+    );
+    git(d.path(), &["switch", "-q", "-c", "other"]);
+    assert_eq!(
+        tempa_core::gitx::base_name(d.path(), &cfg, None),
+        cfg.ci.base
+    );
+}

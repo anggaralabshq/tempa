@@ -1,6 +1,7 @@
 //! Core logic for tempa: config, import, sync, contract checks.
 
 pub mod config;
+pub mod contract;
 pub mod date;
 pub mod import;
 pub mod md;

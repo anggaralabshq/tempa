@@ -39,12 +39,7 @@ fn task_new_creates_branch_and_plan() {
         plan.starts_with(&format!("---\ntask_id: {id}\nstate: plan\n")),
         "{plan}"
     );
-    for h in [
-        "## Tujuan",
-        "## Langkah",
-        "## File yang disentuh",
-        "## Risiko",
-    ] {
+    for h in ["## Goal", "## Steps", "## Files touched", "## Risks"] {
         assert!(plan.contains(h));
     }
 }
@@ -137,11 +132,11 @@ fn pr_body_sections_in_order() {
     log(d.path(), &entry("lulus")).unwrap();
     let b = pr_body(d.path()).unwrap();
     let heads = [
-        "## Ringkasan",
-        "## Link plan",
-        "## Decision terkait",
-        "## Entri changes",
-        "## Hasil harness",
+        "## Summary",
+        "## Plan",
+        "## Decisions",
+        "## Changes",
+        "## Harness",
         "## Review",
         "## Agent + model",
     ];
@@ -196,5 +191,60 @@ fn task_branch_checks_against_the_branch_it_started_from() {
     assert_eq!(
         tempa_core::gitx::base_name(d.path(), &cfg, None),
         cfg.ci.base
+    );
+}
+
+#[test]
+fn plan_and_pr_body_use_english_vocabulary_and_read_legacy_plans() {
+    let d = valid_repo();
+    let id = task_new(d.path(), "eng").unwrap();
+    let plan = read(d.path(), &format!("docs/plans/{id}.md"));
+    assert!(
+        plan.ends_with("---\n## Goal\n\n## Steps\n\n## Files touched\n\n## Risks\n"),
+        "{plan}"
+    );
+    // A plan written with the legacy headings still gives the PR its summary.
+    fill_plan(d.path(), &id);
+    log(d.path(), &entry("pass")).unwrap();
+    let changes = read(d.path(), "CHANGES.md");
+    assert!(
+        changes.contains("- Summary: Tambah endpoint invoice") && changes.contains("- Reason: "),
+        "{changes}"
+    );
+    let body = pr_body(d.path()).unwrap();
+    assert!(
+        body.starts_with("## Summary\n\nTambah invoice\n\n## Plan\n\n"),
+        "{body}"
+    );
+    for s in [
+        "## Decisions",
+        "## Changes",
+        "## Harness",
+        "## Review",
+        "## Agent + model",
+    ] {
+        assert!(body.contains(s), "{s}: {body}");
+    }
+}
+
+#[test]
+fn legacy_change_fields_still_pass_the_contract() {
+    let d = valid_repo();
+    write(
+        d.path(),
+        "CHANGES.md",
+        "# Changes\n\n## 2026-11-01 · 20261101-x\n- Ringkasan: a\n- Alasan: b\n- Decision: -\n- Harness: pass\n- Agent: x\n",
+    );
+    let f = check(
+        d.path(),
+        &CheckOpts {
+            contract_only: true,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert!(
+        !f.iter().any(|x| x.code == "contract.change_field"),
+        "{f:?}"
     );
 }

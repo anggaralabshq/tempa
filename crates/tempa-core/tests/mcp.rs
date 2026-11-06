@@ -161,7 +161,7 @@ fn context_rules_lists_protected_paths() {
     let d = valid_repo();
     let (_, text) = call(d.path(), "tempa_context", json!({"kind": "rules"}));
     assert!(
-        text.contains(".env*") && text.contains("tempa.toml") && text.contains("Area terlarang"),
+        text.contains(".env*") && text.contains("tempa.toml") && text.contains("Off-limits"),
         "{text}"
     );
 }
@@ -214,13 +214,10 @@ fn plan_updates_given_sections_only() {
     assert!(!err, "{text}");
     let after = read(d.path(), &path);
     assert!(
-        after.contains("## Tujuan\n\nTambah invoice.\n") && after.contains("Rendah."),
+        after.contains("## Goal\n\nTambah invoice.\n") && after.contains("Rendah."),
         "{after}"
     );
-    assert!(
-        text.contains("Langkah"),
-        "lists still-empty headings: {text}"
-    );
+    assert!(text.contains("Steps"), "lists still-empty headings: {text}");
     let front = |s: &str| s.split("---").nth(1).unwrap().to_string();
     assert_eq!(front(&before), front(&after));
 }
@@ -237,7 +234,7 @@ fn plan_rejects_unknown_section_without_writing() {
         json!({"sections": {"Tujuan": "a", "Bonus": "b"}}),
     );
     assert!(
-        err && text.contains("Bonus") && text.contains("Tujuan"),
+        err && text.contains("Bonus") && text.contains("Goal"),
         "{text}"
     );
     assert_eq!(read(d.path(), &path), before);
@@ -270,7 +267,7 @@ fn decide_requires_all_sections() {
         "tempa_decide",
         json!({"slug": "pakai-sqlite", "sections": {"Konteks": "a"}}),
     );
-    assert!(err && text.contains("Opsi"), "{text}");
+    assert!(err && text.contains("Options"), "{text}");
     assert!(
         std::fs::read_dir(d.path().join("docs/decisions"))
             .unwrap()
@@ -288,7 +285,7 @@ fn decide_requires_all_sections() {
     );
     assert!(!err, "{text}");
     assert!(
-        read(d.path(), text.trim()).contains("## Keputusan\n\nc\n"),
+        read(d.path(), text.trim()).contains("## Decision\n\nc\n"),
         "{text}"
     );
 }
@@ -332,7 +329,7 @@ fn plan_rejects_non_string_or_empty_values() {
     for bad in [json!(["a", "b"]), json!(null), json!(""), json!("  ")] {
         let (err, text) = call(d.path(), "tempa_plan", json!({"sections": {"Tujuan": bad}}));
         assert!(err, "{bad}: {text}");
-        assert!(text.contains("Tujuan"), "{text}");
+        assert!(text.contains("Goal"), "{text}");
     }
     assert_eq!(plan_text(d.path()), before);
 }

@@ -8,7 +8,6 @@ use crate::{Error, Result, gitx, write_atomic};
 use std::path::Path;
 
 const PLAN: &str = include_str!("templates/plan.md");
-const DECISION: &str = include_str!("templates/decision.md");
 
 fn dir(d: &str) -> String {
     format!("{}/", d.trim_end_matches('/'))
@@ -55,7 +54,8 @@ pub fn task_new(root: &Path, slug: &str) -> Result<String> {
     if let Some(from) = from {
         gitx::set_task_base(root, &from)?;
     }
-    write_atomic(&root.join(&path), PLAN.replace("{id}", &id).as_bytes())?;
+    let plan = PLAN.replace("{id}", &id) + &headings_only(&cfg.headings.plan);
+    write_atomic(&root.join(&path), plan.as_bytes())?;
     Ok(id)
 }
 
@@ -78,6 +78,17 @@ pub fn task_approve(root: &Path) -> Result<()> {
     write_atomic(&root.join(&path), text.as_bytes())
 }
 
+/// `## <h>` blocks with empty bodies, one per required heading.
+fn headings_only(headings: &[String]) -> String {
+    headings
+        .iter()
+        .map(|h| format!("## {h}\n\n"))
+        .collect::<String>()
+        .trim_end()
+        .to_string()
+        + "\n"
+}
+
 /// Create `<decisions>/<YYYY-MM-DD>-<slug>.md`. Returns its path.
 pub fn decide(root: &Path, slug: &str) -> Result<String> {
     check_slug(slug)?;
@@ -86,7 +97,8 @@ pub fn decide(root: &Path, slug: &str) -> Result<String> {
     if root.join(&path).exists() {
         return Err(Error(format!("{path} already exists")));
     }
-    write_atomic(&root.join(&path), DECISION.as_bytes())?;
+    let text = headings_only(&cfg.headings.decisions);
+    write_atomic(&root.join(&path), text.trim_end().as_bytes())?;
     Ok(path)
 }
 
@@ -160,7 +172,12 @@ pub fn pr_body(root: &Path) -> Result<String> {
     let plan = std::fs::read_to_string(root.join(&path)).unwrap_or_default();
     let summary = sections(&plan)
         .into_iter()
-        .find(|s| s.title.eq_ignore_ascii_case("Tujuan"))
+        .find(|s| {
+            cfg.headings
+                .plan
+                .first()
+                .is_some_and(|goal| crate::contract::same_name(goal, &s.title))
+        })
         .map(|s| s.body.trim().to_string())
         .filter(|s| !s.is_empty())
         .unwrap_or_else(|| "-".into());
@@ -213,8 +230,8 @@ pub fn pr_body(root: &Path) -> Result<String> {
     };
 
     Ok(format!(
-        "## Ringkasan\n\n{summary}\n\n## Link plan\n\n{path}\n\n## Decision terkait\n\n{}\n\n\
-         ## Entri changes\n\n{}\n\n## Hasil harness\n\n{harness}\n\n\
+        "## Summary\n\n{summary}\n\n## Plan\n\n{path}\n\n## Decisions\n\n{}\n\n\
+         ## Changes\n\n{}\n\n## Harness\n\n{harness}\n\n\
          ## Review\n\n{reviewer}\n\n## Agent + model\n\n{agent}\n",
         or_dash(decisions.iter().map(|d| format!("- {d}")).collect()),
         or_dash(

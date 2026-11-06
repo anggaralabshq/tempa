@@ -215,3 +215,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-english-vocabulary
+- Summary: English default contract vocabulary with legacy Indonesian aliases
+- Reason: CLI is going public; all other user-facing text is English
+- Decision: docs/decisions/2026-11-06-english-default-vocabulary.md
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

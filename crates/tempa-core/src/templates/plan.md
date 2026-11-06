@@ -6,10 +6,3 @@ approved_at:
 implementer:
 reviewer:
 ---
-## Tujuan
-
-## Langkah
-
-## File yang disentuh
-
-## Risiko

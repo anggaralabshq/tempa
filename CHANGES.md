@@ -55,3 +55,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-app-terminal
+- Ringkasan: Terminal: pty per pane with the login-shell PATH
+- Alasan: M2: agents run in the app's terminal and must find tempa, claude, codex
+- Decision: docs/decisions/2026-11-06-desktop-stack-tauri.md
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

@@ -107,16 +107,23 @@ impl PtyManager {
             .map_err(err)
     }
 
-    /// Ask the process to end; the waiter removes the session once it has.
+    /// End the terminal: kill the shell, then close the pty. Closing the master is what
+    /// ends the rest of the tree (SIGHUP to the foreground group on Unix; on Windows every
+    /// process attached to the pseudoconsole), so agents started in the shell do not
+    /// outlive their pane.
     pub fn kill(&self, id: u32) -> Result<(), String> {
-        match self.sessions().get_mut(&id) {
-            Some(s) => s.killer.kill().map_err(err),
-            None => Ok(()),
+        let session = self.sessions().remove(&id);
+        if let Some(mut s) = session {
+            // ponytail: ignore the result; portable-pty 0.9 on Windows can report a
+            // successful TerminateProcess as an error, and closing the pty follows anyway.
+            let _ = s.killer.kill();
         }
+        Ok(())
     }
 
     pub fn kill_all(&self) {
-        for s in self.sessions().values_mut() {
+        let all: Vec<Session> = self.sessions().drain().map(|(_, s)| s).collect();
+        for mut s in all {
             let _ = s.killer.kill();
         }
     }
@@ -125,10 +132,21 @@ impl PtyManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::mpsc;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
-    fn collect(
+    fn shell(script_unix: &str, script_win: &str) -> CommandBuilder {
+        if cfg!(windows) {
+            let mut c = CommandBuilder::new("cmd");
+            c.args(["/C", script_win]);
+            c
+        } else {
+            let mut c = CommandBuilder::new("sh");
+            c.args(["-c", script_unix]);
+            c
+        }
+    }
+
+    fn start(
         cmd: CommandBuilder,
     ) -> (
         PtyManager,
@@ -155,69 +173,61 @@ mod tests {
         (m, id, drx, erx)
     }
 
-    #[test]
-    fn spawn_echo_reports_output_and_exit() {
-        let mut cmd = if cfg!(windows) {
-            CommandBuilder::new("cmd")
-        } else {
-            CommandBuilder::new("sh")
-        };
-        if cfg!(windows) {
-            cmd.args(["/C", "echo hi & exit 3"]);
-        } else {
-            cmd.args(["-c", "echo hi; exit 3"]);
+    /// Output and exit code. Answers ConPTY's cursor-position request (ESC[6n) the way
+    /// xterm.js does in the app; without an answer ConPTY holds the output back.
+    fn until_exit(
+        m: &PtyManager,
+        id: u32,
+        drx: &mpsc::Receiver<Vec<u8>>,
+        erx: &mpsc::Receiver<i32>,
+    ) -> (String, i32) {
+        let deadline = Instant::now() + Duration::from_secs(20);
+        let mut out = Vec::new();
+        let mut answered = false;
+        loop {
+            if let Ok(b) = drx.recv_timeout(Duration::from_millis(50)) {
+                out.extend(b);
+                if !answered && out.windows(4).any(|w| w == b"\x1b[6n") {
+                    let _ = m.write(id, b"\x1b[1;1R");
+                    answered = true;
+                }
+            }
+            if let Ok(code) = erx.try_recv() {
+                out.extend(drx.try_iter().flatten());
+                return (String::from_utf8_lossy(&out).to_string(), code);
+            }
+            assert!(
+                Instant::now() < deadline,
+                "no exit; output so far: {:?}",
+                String::from_utf8_lossy(&out)
+            );
         }
-        let (_m, _id, drx, erx) = collect(cmd);
-        assert_eq!(erx.recv_timeout(Duration::from_secs(10)).unwrap(), 3);
-        let out: Vec<u8> = drx.try_iter().flatten().collect();
-        assert!(String::from_utf8_lossy(&out).contains("hi"), "{out:?}");
     }
 
     #[test]
-    fn kill_ends_process() {
-        let mut cmd = if cfg!(windows) {
-            CommandBuilder::new("cmd")
-        } else {
-            CommandBuilder::new("sh")
-        };
-        if cfg!(windows) {
-            cmd.args(["/C", "ping -n 30 127.0.0.1 >NUL"]);
-        } else {
-            cmd.args(["-c", "sleep 30"]);
-        }
-        let (m, id, _drx, erx) = collect(cmd);
-        m.kill(id).unwrap();
-        erx.recv_timeout(Duration::from_secs(10))
-            .expect("exit after kill");
-        assert!(m.write(id, b"x").is_err(), "killed session is gone");
+    fn spawn_echo_reports_output_and_exit() {
+        let (m, id, drx, erx) = start(shell("echo hi; exit 3", "echo hi & exit 3"));
+        let (out, code) = until_exit(&m, id, &drx, &erx);
+        assert_eq!(code, 3, "{out}");
+        assert!(out.contains("hi"), "{out}");
     }
 
     #[test]
     fn write_reaches_the_shell() {
-        let mut cmd = if cfg!(windows) {
-            CommandBuilder::new("cmd")
-        } else {
-            CommandBuilder::new("sh")
-        };
-        if !cfg!(windows) {
-            cmd.args(["-c", "read line; echo got:$line"]);
-        }
-        let (m, id, drx, erx) = collect(cmd);
-        m.write(
-            id,
-            if cfg!(windows) {
-                b"echo got:ok\r\nexit\r\n"
-            } else {
-                b"ok\n"
-            },
-        )
-        .unwrap();
-        erx.recv_timeout(Duration::from_secs(10)).unwrap();
-        let out: Vec<u8> = drx.try_iter().flatten().collect();
-        assert!(
-            String::from_utf8_lossy(&out).contains("got:ok"),
-            "{}",
-            String::from_utf8_lossy(&out)
-        );
+        let (m, id, drx, erx) = start(shell(
+            "read line; echo got:$line",
+            "set /p line= & call echo got:%line%",
+        ));
+        m.write(id, b"ok\r").unwrap();
+        let (out, _) = until_exit(&m, id, &drx, &erx);
+        assert!(out.contains("got:ok"), "{out}");
+    }
+
+    #[test]
+    fn kill_closes_the_session_and_ends_the_process() {
+        let (m, id, drx, erx) = start(shell("sleep 30", "ping -n 30 127.0.0.1 >NUL"));
+        m.kill(id).unwrap();
+        assert!(m.write(id, b"x").is_err(), "session closes at once");
+        until_exit(&m, id, &drx, &erx);
     }
 }

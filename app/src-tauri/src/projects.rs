@@ -40,16 +40,6 @@ pub fn list(file: &Path) -> Vec<Project> {
 }
 
 /// Add a folder (same folder twice returns the existing entry).
-/// Stable project id from its display path (what the frontend holds as `path`).
-pub fn id(path: &str) -> String {
-    tempa_core::sync::hash(path.as_bytes())[..12].to_string()
-}
-
-/// Host data for one project: `<data>/projects/<id>/`.
-pub fn data_dir(data: &Path, path: &str) -> std::path::PathBuf {
-    data.join("projects").join(id(path))
-}
-
 pub fn add(file: &Path, folder: &Path) -> Result<Project, String> {
     let canon = std::fs::canonicalize(folder).map_err(|e| format!("{}: {e}", folder.display()))?;
     if !canon.is_dir() {
@@ -61,7 +51,7 @@ pub fn add(file: &Path, folder: &Path) -> Result<Project, String> {
         return Ok(p.clone());
     }
     let p = Project {
-        id: id(&path),
+        id: tempa_core::sync::hash(path.as_bytes())[..12].to_string(),
         name: canon
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
@@ -81,16 +71,6 @@ pub fn remove(file: &Path, id: &str) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn data_dir_is_keyed_by_project_id() {
-        let d = super::data_dir(std::path::Path::new("/data"), "/src/api");
-        assert_eq!(
-            d,
-            std::path::Path::new("/data/projects").join(super::id("/src/api"))
-        );
-        assert_eq!(super::id("/src/api").len(), 12);
-    }
-
     use super::*;
 
     fn setup() -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {

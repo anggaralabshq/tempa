@@ -117,6 +117,11 @@ pub struct Section {
 }
 
 fn heading(line: &str) -> Option<(u8, String)> {
+    let indent = line.len() - line.trim_start_matches(' ').len();
+    if indent > 3 {
+        return None;
+    }
+    let line = &line[indent..];
     let hashes = line.bytes().take_while(|b| *b == b'#').count();
     if !(1..=6).contains(&hashes) {
         return None;
@@ -134,14 +139,19 @@ pub fn sections(md: &str) -> Vec<Section> {
     let text = normalize_eol(md);
     let lines: Vec<&str> = text.lines().collect();
     let mut heads = Vec::new();
-    let mut fence = false;
+    // A fence closes only with the same marker it opened with.
+    let mut fence: Option<&str> = None;
     for (i, line) in lines.iter().enumerate() {
         let t = line.trim_start();
-        if t.starts_with("```") || t.starts_with("~~~") {
-            fence = !fence;
+        if let Some(m) = ["```", "~~~"].into_iter().find(|m| t.starts_with(m)) {
+            match fence {
+                None => fence = Some(m),
+                Some(open) if open == m => fence = None,
+                Some(_) => {}
+            }
             continue;
         }
-        if !fence {
+        if fence.is_none() {
             if let Some((level, title)) = heading(line) {
                 heads.push((i, level, title));
             }

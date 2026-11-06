@@ -231,6 +231,42 @@ fn toml_multiline(s: &str) -> String {
     )
 }
 
+/// Claude command syntax → Gemini: `$ARGUMENTS` → `{{args}}`, `` !`cmd` `` → `!{cmd}`,
+/// `@path` (a word with `/` or `.`) → `@{path}`.
+fn gemini_prompt(body: &str) -> String {
+    let mut s = body.replace("$ARGUMENTS", "{{args}}");
+    while let Some(i) = s.find("!`") {
+        let Some(j) = s[i + 2..].find('`') else { break };
+        let cmd = s[i + 2..i + 2 + j].to_string();
+        s.replace_range(i..i + 3 + j, &format!("!{{{cmd}}}"));
+    }
+    let mut out = String::with_capacity(s.len());
+    let mut prev_ws = true;
+    let mut rest = s.as_str();
+    while let Some(ch) = rest.chars().next() {
+        if ch == '@' && prev_ws {
+            let word: String = rest[1..]
+                .chars()
+                .take_while(|c| !c.is_whitespace())
+                .collect();
+            let path = word.trim_end_matches([',', ';', ':', ')', '.']);
+            if !path.is_empty()
+                && (path.contains('/') || path.contains('.'))
+                && !path.starts_with('{')
+            {
+                out.push_str(&format!("@{{{path}}}"));
+                rest = &rest[1 + path.len()..];
+                prev_ws = false;
+                continue;
+            }
+        }
+        out.push(ch);
+        prev_ws = ch.is_whitespace();
+        rest = &rest[ch.len_utf8()..];
+    }
+    out
+}
+
 /// `${NAME}` → `NAME`.
 fn env_ref(v: &str) -> Option<&str> {
     v.strip_prefix("${")
@@ -400,10 +436,13 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 if let Some(d) = front_get(c, "description") {
                     t += &format!("description = {}\n", toml_basic(d));
                 }
-                t += &format!(
-                    "prompt = {}\n",
-                    toml_multiline(&c.body.replace("$ARGUMENTS", "{{args}}"))
-                );
+                if (1..=9).any(|n| c.body.contains(&format!("${n}"))) {
+                    o.gap(
+                        "commands",
+                        &format!("{} ($1..$9 tidak didukung Gemini; pakai $ARGUMENTS)", c.rel),
+                    );
+                }
+                t += &format!("prompt = {}\n", toml_multiline(&gemini_prompt(&c.body)));
                 let rel = c.rel.strip_suffix(".md").unwrap_or(&c.rel);
                 o.file(format!(".gemini/commands/{rel}.toml"), t);
             }

@@ -153,7 +153,7 @@ fn pr_body_sections_in_order() {
     assert!(b.contains("Tambah invoice"));
     assert!(b.contains(&format!("docs/plans/{id}.md")));
     assert!(b.contains("codex / gpt-5"));
-    assert!(b.contains("Lihat pipeline Bitbucket."));
+    assert!(b.contains("tempa check --base main"));
 }
 
 #[test]

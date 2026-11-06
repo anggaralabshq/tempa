@@ -1,10 +1,24 @@
-# tempa
+<div align="center">
 
-One context contract and one workflow for every coding agent.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-dark.png">
+  <img src="docs/assets/banner-light.png" width="100%" alt="tempa: one context contract for every coding agent">
+</picture>
+
+### One context contract and one workflow for every coding agent
+
+**[Quick start ↓](#quick-start)** &nbsp;·&nbsp; **[Install ↓](#install)** &nbsp;·&nbsp; **[Agent support →](docs/target-matrix.md)** &nbsp;·&nbsp; **[Releases →](https://github.com/anggaralabshq/tempa/releases)**
+
+[![CI](https://github.com/anggaralabshq/tempa/actions/workflows/ci.yml/badge.svg?event=pull_request)](https://github.com/anggaralabshq/tempa/actions/workflows/ci.yml)
+[![crates.io](https://img.shields.io/crates/v/tempa-cli?label=crates.io)](https://crates.io/crates/tempa-cli)
+[![Release](https://img.shields.io/github/v/release/anggaralabshq/tempa?logo=github)](https://github.com/anggaralabshq/tempa/releases)
+[![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue)](#license)
+
+</div>
 
 ![tempa importing a Claude Code repo, reporting per-agent parity, and absorbing a direct edit back into the source](docs/demo/demo.gif)
 
-Teams rarely use a single coding agent. One engineer lives in Claude Code, another in Codex, Gemini CLI, OpenCode, Cursor or GitHub Copilot, and each reads a different set of files. Project knowledge piles up in one agent's format (usually `CLAUDE.md` and `.claude/`), and everyone else starts from zero. Output quality drifts with it.
+Teams rarely use a single coding agent. One engineer lives in Claude Code, another in Codex, Gemini CLI, OpenCode, Cursor or GitHub Copilot, and each reads a different set of files. Project knowledge piles up in one agent's format (usually `CLAUDE.md` and `.claude/`), and teammates on other agents work without it: they miss the conventions, run the wrong commands, and output quality depends on which agent wrote the code.
 
 tempa keeps the contract in one neutral place and makes every agent read it, then holds every change to the same workflow:
 
@@ -13,7 +27,37 @@ tempa keeps the contract in one neutral place and makes every agent read it, the
 - **One workflow.** Every change is a task with a plan, an optional decision record, a changes entry naming the agent and model used, and a pull request body with the same structure, whichever agent did the work.
 - **Gates before CI.** Git hooks sync and check locally; the same `tempa check` runs in CI when you add it.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/architecture-dark.png">
+  <img src="docs/assets/architecture-light.png" width="100%" alt="AGENTS.md and .tempa/ go into tempa, which syncs every agent's files (Claude Code, Codex, Gemini CLI, OpenCode, Cursor, GitHub Copilot) and absorbs direct edits back into the source">
+</picture>
+
 Supported agents: Claude Code, Codex, Gemini CLI, OpenCode, Cursor, GitHub Copilot. What each one supports, and where tempa has to fall back, is in [docs/target-matrix.md](docs/target-matrix.md); `tempa doctor` reports it per repo.
+
+## Quick start
+
+**1. Install**
+
+```sh
+brew install anggaralabshq/tap/tempa     # or cargo, or a binary: see Install below
+```
+
+**2. Adopt it in your repo**
+
+```sh
+tempa import          # dry run: shows what would be absorbed from CLAUDE.md, .claude/, .cursorrules, ...
+tempa import --yes    # writes AGENTS.md, .tempa/, tempa.toml, hooks; syncs every agent
+```
+
+No agent files yet? Run `tempa init` instead (`tempa.toml`, `AGENTS.md`, `HARNESS.md`, `CHANGES.md`, git hooks).
+
+**3. See what every agent gets**
+
+```sh
+tempa doctor          # generated files, gaps, protected paths, hook status per agent
+```
+
+Each engineer runs `tempa init` once per clone to install the hooks (it never overwrites existing files).
 
 ## Install
 
@@ -23,24 +67,6 @@ cargo install tempa-cli --locked         # any platform with Rust 1.85+
 ```
 
 Or download a binary for macOS, Linux or Windows from [Releases](https://github.com/anggaralabshq/tempa/releases). tempa needs git on PATH. From a clone: `cargo install --path crates/tempa-cli --locked`.
-
-## Quick start
-
-An existing repo with agent files (`CLAUDE.md`, `.claude/`, `.cursorrules`, ...):
-
-```sh
-tempa import          # dry run: shows what would be absorbed
-tempa import --yes    # writes AGENTS.md, .tempa/, tempa.toml, hooks; syncs every agent
-tempa doctor          # what each agent gets, and the gaps
-```
-
-A repo without agent files:
-
-```sh
-tempa init            # tempa.toml, AGENTS.md, HARNESS.md, CHANGES.md, git hooks
-```
-
-Each engineer runs `tempa init` once per clone to install the hooks (it never overwrites existing files).
 
 ## Daily workflow
 

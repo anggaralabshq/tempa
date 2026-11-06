@@ -76,3 +76,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-readme-demo
+- Summary: README demo GIF (vhs tape) and aligned doctor table
+- Reason: Public readiness: show the product on the first screen
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

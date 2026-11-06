@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::Path;
 use std::process::{Command, ExitCode};
-use tempa_core::{Finding, Severity, import, sync};
+use tempa_core::{Finding, Severity, check, import, sync};
 
 #[derive(Parser)]
 #[command(name = "tempa", version, about = "Satu kontrak konteks untuk semua coding agent")]
@@ -20,6 +20,15 @@ enum Cmd {
         /// Untuk hook pre-commit: sync + git add bila aman, blokir bila target diedit langsung
         #[arg(long)]
         fix: bool,
+    },
+    /// Periksa drift, kontrak dokumen, aturan task, lalu harness
+    Check {
+        /// Lewati harness (untuk step Bitbucket Pipelines)
+        #[arg(long)]
+        contract_only: bool,
+        /// Branch dasar (default: BITBUCKET_PR_DESTINATION_BRANCH atau [ci].base)
+        #[arg(long)]
+        base: Option<String>,
     },
     /// Serap .claude/, CLAUDE.md, .cursorrules, dll. ke sumber netral, lalu sync
     Import {
@@ -95,6 +104,9 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
                 println!("synced {p}");
             }
             Ok(false)
+        }
+        Cmd::Check { contract_only, base } => {
+            Ok(print_findings(&check::check(root, &check::CheckOpts { contract_only, base })?))
         }
         Cmd::Import { yes } => {
             let report = import::import(root, yes)?;

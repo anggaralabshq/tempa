@@ -200,7 +200,7 @@ pub fn set_section(md: &str, title: &str, body: &str) -> Option<String> {
     }
     let n = heads
         .iter()
-        .position(|(_, _, t)| t.eq_ignore_ascii_case(title))?;
+        .position(|(_, _, t)| crate::contract::same_name(title, t))?;
     let (start, level, _) = heads[n];
     let end = heads[n + 1..]
         .iter()

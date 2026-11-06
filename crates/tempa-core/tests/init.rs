@@ -36,7 +36,7 @@ fn init_fresh_repo_then_check_runs() {
         "{devops}"
     );
     assert!(devops.contains("tempa check --contract-only") && devops.contains("depth: full"));
-    assert!(read(d.path(), "AGENTS.md").contains("## Area terlarang"));
+    assert!(read(d.path(), "AGENTS.md").contains("## Off-limits"));
     sync(d.path()).unwrap();
     let f = check(
         d.path(),

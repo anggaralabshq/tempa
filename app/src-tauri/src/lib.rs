@@ -203,17 +203,23 @@ async fn chat_start(
             verify.to_string_lossy().into(),
         ],
     };
+    let ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let transcript = projects::data_dir(&data, &root)
+        .join("sessions")
+        .join(format!("{ms}-{agent}.jsonl"));
     let emit: acp::chat::Emit = std::sync::Arc::new(move |e| {
         let _ = on_event.send(e);
     });
-    chats.start_with(
-        &program,
-        &args,
-        std::path::Path::new(&cwd),
-        path.as_deref(),
-        mcp,
-        emit,
-    )
+    let run = acp::chat::Run {
+        program: &program,
+        args: &args,
+        cwd: std::path::Path::new(&cwd),
+        path_env: path.as_deref(),
+    };
+    chats.start_with(run, mcp, Some(transcript), emit)
 }
 
 #[tauri::command]

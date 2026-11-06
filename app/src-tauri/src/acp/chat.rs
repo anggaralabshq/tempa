@@ -6,7 +6,8 @@ use super::session::{McpLaunch, Session};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::HashMap;
-use std::path::Path;
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
@@ -18,6 +19,35 @@ struct Chat {
     session: Session,
     waiting: Waiting,
     emit: Emit,
+    log: Log,
+}
+
+/// Append-only JSONL transcript of a chat (None = not recorded).
+#[derive(Clone, Default)]
+struct Log(Option<Arc<Mutex<std::fs::File>>>);
+
+impl Log {
+    fn open(path: Option<PathBuf>) -> Result<Log, String> {
+        let Some(path) = path else {
+            return Ok(Log(None));
+        };
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        }
+        let f = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .map_err(|e| format!("{}: {e}", path.display()))?;
+        Ok(Log(Some(Arc::new(Mutex::new(f)))))
+    }
+
+    fn write(&self, v: &Value) {
+        if let Some(f) = &self.0 {
+            let mut f = f.lock().unwrap_or_else(|p| p.into_inner());
+            let _ = writeln!(f, "{v}");
+        }
+    }
 }
 
 impl Chat {
@@ -32,6 +62,14 @@ impl Chat {
             let _ = tx.send(None);
         }
     }
+}
+
+/// How to run the agent process.
+pub struct Run<'a> {
+    pub program: &'a Path,
+    pub args: &'a [String],
+    pub cwd: &'a Path,
+    pub path_env: Option<&'a str>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -65,13 +103,23 @@ impl ChatManager {
     /// Events: `update`, `permission`, `turn_end`, `error`, `exit`.
     pub fn start_with(
         &self,
-        program: &Path,
-        args: &[String],
-        cwd: &Path,
-        path_env: Option<&str>,
+        run: Run,
         mcp: McpLaunch,
+        transcript: Option<PathBuf>,
         emit: Emit,
     ) -> Result<Started, String> {
+        let Run {
+            program,
+            args,
+            cwd,
+            path_env,
+        } = run;
+        let log = Log::open(transcript)?;
+        let (raw, l) = (emit, log.clone());
+        let emit: Emit = Arc::new(move |e: Value| {
+            l.write(&e);
+            raw(e);
+        });
         let waiting: Waiting = Arc::default();
         let next_req = Arc::new(AtomicU64::new(1));
         let (on_update, on_ask, on_exit) = (emit.clone(), emit.clone(), emit.clone());
@@ -116,6 +164,7 @@ impl ChatManager {
             session,
             waiting,
             emit,
+            log,
         });
         self.chats
             .lock()
@@ -127,6 +176,7 @@ impl ChatManager {
     /// Send a turn; the result arrives as `turn_end` or `error`.
     pub fn prompt(&self, id: u32, text: &str) -> Result<(), String> {
         let chat = self.get(id)?;
+        chat.log.write(&json!({"type": "user", "text": text}));
         let text = text.to_string();
         std::thread::spawn(move || {
             let ev = match chat.session.prompt(&text) {

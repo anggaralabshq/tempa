@@ -259,11 +259,14 @@ fn cancel_answers_pending_permission_cancelled() {
     let m = ChatManager::default();
     let started = m
         .start_with(
-            &node(),
-            &fake_args(),
-            Path::new(env!("CARGO_MANIFEST_DIR")),
-            None,
+            super::chat::Run {
+                program: &node(),
+                args: &fake_args(),
+                cwd: Path::new(env!("CARGO_MANIFEST_DIR")),
+                path_env: None,
+            },
             mcp(),
+            None,
             std::sync::Arc::new(move |e: Value| {
                 let _ = tx.send(e);
             }),
@@ -280,4 +283,43 @@ fn cancel_answers_pending_permission_cancelled() {
     assert_eq!(said, r#"{"outcome":"cancelled"}"#);
     assert!(rx.iter().any(|e| e["type"] == "turn_end"));
     m.stop_all();
+}
+
+#[test]
+fn transcript_records_prompts_and_events() {
+    use super::chat::ChatManager;
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("sessions/1-fake.jsonl");
+    let (tx, rx) = mpsc::channel::<Value>();
+    let m = ChatManager::default();
+    let started = m
+        .start_with(
+            super::chat::Run {
+                program: &node(),
+                args: &fake_args(),
+                cwd: Path::new(env!("CARGO_MANIFEST_DIR")),
+                path_env: None,
+            },
+            mcp(),
+            Some(file.clone()),
+            std::sync::Arc::new(move |e: Value| {
+                let _ = tx.send(e);
+            }),
+        )
+        .unwrap();
+    m.prompt(started.id, "echo hi").unwrap();
+    assert!(rx.iter().any(|e| e["type"] == "turn_end"));
+    m.stop_all();
+    let lines: Vec<Value> = std::fs::read_to_string(&file)
+        .unwrap()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect();
+    assert_eq!(lines[0], json!({"type": "user", "text": "echo hi"}));
+    assert!(
+        lines
+            .iter()
+            .any(|e| e["update"]["content"]["text"] == "echo hi")
+    );
+    assert!(lines.iter().any(|e| e["type"] == "turn_end"));
 }

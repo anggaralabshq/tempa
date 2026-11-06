@@ -222,3 +222,10 @@
 - Decision: docs/decisions/2026-11-06-english-default-vocabulary.md
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-english-docs
+- Summary: Move this repo's contract and docs to English
+- Reason: English is the default vocabulary and the repo is going public
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

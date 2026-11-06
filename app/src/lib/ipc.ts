@@ -36,7 +36,9 @@ export type ContractAction = "absorb" | "discard" | "init" | "import" | "hooks";
 export const contractStatus = (root: string) => invoke<ContractStatus>("contract_status", { root });
 export const contractPreview = (root: string, action: "absorb" | "discard") =>
   invoke<string[]>("contract_preview", { root, action });
-export const contractRun = (root: string, action: ContractAction) => invoke<string[]>("contract_run", { root, action });
+/** `reviewed`: the file list the user confirmed; the backend refuses if it no longer matches. */
+export const contractRun = (root: string, action: ContractAction, reviewed: string[]) =>
+  invoke<string[]>("contract_run", { root, action, reviewed });
 
 /** What the watcher reports after a source sync or a change in drift. */
 export type ContractUpdate = { root: string; synced: string[]; conflicts: string[]; drift: number; error: string | null };

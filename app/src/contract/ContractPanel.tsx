@@ -46,10 +46,10 @@ export default function ContractPanel({ root, refresh = 0 }: { root: string | nu
   };
   const confirm = async () => {
     if (!pending) return;
-    const { action } = pending;
+    const { action, files } = pending;
     setPending(null);
     try {
-      const changed = await contractRun(root, action);
+      const changed = await contractRun(root, action, files);
       setNote(changed.length ? `${action}: ${changed.length} file(s) changed` : `${action}: nothing to change`);
     } catch (e) {
       setNote(String(e));
@@ -98,12 +98,14 @@ export default function ContractPanel({ root, refresh = 0 }: { root: string | nu
       {note && <p className="text-white/60">{note}</p>}
 
       {!s.has_config ? (
+        s.offer && (
         <>
           <p className="text-white/60">This folder has no tempa.toml yet.</p>
-          <button type="button" onClick={() => ask(s.offer ?? "init")} className="rounded bg-white/10 px-2 py-1 hover:bg-white/15">
+          <button type="button" onClick={() => s.offer && ask(s.offer)} className="rounded bg-white/10 px-2 py-1 hover:bg-white/15">
             {s.offer === "import" ? "Import agent files" : "Set up tempa"}
           </button>
         </>
+        )
       ) : (
         <>
           <H>Documents</H>

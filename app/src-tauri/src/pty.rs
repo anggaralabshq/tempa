@@ -9,7 +9,9 @@ use std::sync::{Arc, Mutex, mpsc};
 
 struct Session {
     master: Box<dyn MasterPty + Send>,
-    writer: Box<dyn Write + Send>,
+    /// Input queue for the session's writer thread: a write blocked on a full tty holds
+    /// up neither the UI nor the other terminals, and keystrokes stay in order.
+    input: mpsc::Sender<Vec<u8>>,
     killer: Box<dyn ChildKiller + Send + Sync>,
 }
 
@@ -49,14 +51,27 @@ impl PtyManager {
         let mut child = pair.slave.spawn_command(cmd).map_err(err)?;
         drop(pair.slave);
         let mut reader = pair.master.try_clone_reader().map_err(err)?;
-        let writer = pair.master.take_writer().map_err(err)?;
+        let mut writer = pair.master.take_writer().map_err(err)?;
+        let (input, queue) = mpsc::channel::<Vec<u8>>();
+        // Ends when the session (and so `input`) is dropped.
+        std::thread::spawn(move || {
+            while let Ok(bytes) = queue.recv() {
+                if writer
+                    .write_all(&bytes)
+                    .and_then(|_| writer.flush())
+                    .is_err()
+                {
+                    break;
+                }
+            }
+        });
         let killer = child.clone_killer();
         let id = self.next.fetch_add(1, Ordering::Relaxed) + 1;
         self.sessions().insert(
             id,
             Session {
                 master: pair.master,
-                writer,
+                input,
                 killer,
             },
         );
@@ -86,10 +101,14 @@ impl PtyManager {
         Ok(id)
     }
 
+    /// Queue `data` for the terminal; never blocks.
     pub fn write(&self, id: u32, data: &[u8]) -> Result<(), String> {
-        let mut s = self.sessions();
-        let w = &mut s.get_mut(&id).ok_or("terminal has exited")?.writer;
-        w.write_all(data).and_then(|_| w.flush()).map_err(err)
+        let s = self.sessions();
+        let session = s.get(&id).ok_or("terminal has exited")?;
+        session
+            .input
+            .send(data.to_vec())
+            .map_err(|_| "terminal has exited".to_string())
     }
 
     pub fn resize(&self, id: u32, cols: u16, rows: u16) -> Result<(), String> {
@@ -229,5 +248,29 @@ mod tests {
         m.kill(id).unwrap();
         assert!(m.write(id, b"x").is_err(), "session closes at once");
         until_exit(&m, id, &drx, &erx);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn blocked_write_does_not_freeze_other_terminals() {
+        let (m, busy, _d, _e) = start(shell("sleep 30", ""));
+        let m = std::sync::Arc::new(m);
+        let other = m
+            .spawn(shell("sleep 30", ""), 80, 24, |_| {}, |_| {})
+            .unwrap();
+        // A big paste into a shell whose foreground job never reads: the tty fills up.
+        let m2 = std::sync::Arc::clone(&m);
+        std::thread::spawn(move || {
+            let _ = m2.write(busy, "x\n".repeat(200_000).as_bytes());
+        });
+        std::thread::sleep(Duration::from_millis(500));
+        let (tx, rx) = mpsc::channel();
+        let m3 = std::sync::Arc::clone(&m);
+        std::thread::spawn(move || {
+            let _ = tx.send(m3.resize(other, 100, 30));
+        });
+        let resized = rx.recv_timeout(Duration::from_secs(2));
+        m.kill_all();
+        assert!(resized.is_ok(), "resize waited on another pane's write");
     }
 }

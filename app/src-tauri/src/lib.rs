@@ -106,8 +106,12 @@ async fn contract_preview(root: String, action: String) -> Result<Vec<String>, S
 }
 
 #[tauri::command]
-async fn contract_run(root: String, action: String) -> Result<Vec<String>, String> {
-    contract::run(std::path::Path::new(&root), &action)
+async fn contract_run(
+    root: String,
+    action: String,
+    reviewed: Vec<String>,
+) -> Result<Vec<String>, String> {
+    contract::run(std::path::Path::new(&root), &action, &reviewed)
 }
 
 /// Watch `root`: source edits sync, drift changes emit `contract-changed` with an `Update`.

@@ -38,9 +38,14 @@ fn parse_login_path_output(output: &[u8]) -> Option<String> {
 
 /// The user's shell for new terminals.
 pub fn user_shell() -> String {
+    static SHELL: OnceLock<String> = OnceLock::new();
+    SHELL.get_or_init(detect_shell).clone()
+}
+
+fn detect_shell() -> String {
     if cfg!(windows) {
         // ponytail: pwsh when installed, else Windows PowerShell (always present).
-        let has_pwsh = Command::new("pwsh")
+        let has_pwsh = tempa_core::command("pwsh")
             .args(["-NoLogo", "-NoProfile", "-Command", "exit"])
             .stdout(Stdio::null())
             .stderr(Stdio::null())

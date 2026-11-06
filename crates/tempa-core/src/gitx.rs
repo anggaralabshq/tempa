@@ -4,10 +4,9 @@ use crate::config::Config;
 use crate::{Error, Result};
 use std::collections::BTreeSet;
 use std::path::Path;
-use std::process::Command;
 
 fn git(root: &Path, args: &[&str]) -> Result<String> {
-    let out = Command::new("git")
+    let out = crate::command("git")
         .arg("-C")
         .arg(root)
         .args(["-c", "core.quotepath=false"])

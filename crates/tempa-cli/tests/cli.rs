@@ -90,3 +90,17 @@ fn import_dry_run_then_yes() {
     assert!(std::fs::read_to_string(d.path().join("CLAUDE.md")).unwrap().contains("@AGENTS.md"));
     assert_eq!(tempa(d.path(), &["sync", "--check"]).status.code(), Some(0));
 }
+
+#[test]
+fn check_base_unavailable_is_error_in_pipelines() {
+    let d = tempfile::tempdir().unwrap();
+    git(d.path(), &["init", "-q", "-b", "work"]);
+    write(d.path(), "tempa.toml", &tempa_core::config::default_toml("x"));
+    let local = Command::new(env!("CARGO_BIN_EXE_tempa")).current_dir(d.path()).args(["check", "--contract-only"])
+        .env_remove("BITBUCKET_PR_ID").output().unwrap();
+    assert!(stdout(&local).contains("warning[git.base_unavailable]"), "{}", stdout(&local));
+    let ci = Command::new(env!("CARGO_BIN_EXE_tempa")).current_dir(d.path()).args(["check", "--contract-only"])
+        .env("BITBUCKET_PR_ID", "1").output().unwrap();
+    assert!(stdout(&ci).contains("error[git.base_unavailable]"), "{}", stdout(&ci));
+    assert_eq!(ci.status.code(), Some(1));
+}

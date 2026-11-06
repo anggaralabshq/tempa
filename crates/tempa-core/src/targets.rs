@@ -79,7 +79,7 @@ fn with_header(front_raw: Option<&str>, body: &str) -> String {
 }
 
 /// Frontmatter built from chosen pairs only.
-fn front_of(pairs: &[(&str, &str)]) -> String {
+pub(crate) fn front_of(pairs: &[(&str, &str)]) -> String {
     pairs
         .iter()
         .map(|(k, v)| format!("{k}: {}\n", yaml_scalar(v)))

@@ -288,6 +288,38 @@ fn copy_in(root: &Path, from: &str, to: &str, plan: &mut Plan) -> Result<()> {
     Ok(())
 }
 
+/// A hand-written `.codex/agents/<x>.toml` as a markdown subagent (name, description,
+/// developer_instructions → frontmatter and body).
+fn codex_agent_in(root: &Path, from: &str, to: &str, plan: &mut Plan) -> Result<()> {
+    let text = std::fs::read_to_string(root.join(from))?;
+    let t = text.parse::<toml::Table>().ok();
+    let get = |k: &str| {
+        t.as_ref()
+            .and_then(|t| t.get(k)?.as_str().map(String::from))
+    };
+    let Some(body) = get("developer_instructions") else {
+        plan.report
+            .gaps
+            .push(format!("{from}: no developer_instructions, not absorbed"));
+        return Ok(());
+    };
+    let stem = to.rsplit('/').next().unwrap_or(to).trim_end_matches(".md");
+    let name = get("name").unwrap_or_else(|| stem.to_string());
+    let mut pairs = vec![("name", name.as_str())];
+    let desc = get("description");
+    if let Some(d) = &desc {
+        pairs.push(("description", d));
+    }
+    let md = format!("---\n{}---\n{body}", crate::targets::front_of(&pairs));
+    match std::fs::read(root.join(to)) {
+        Ok(existing) if hash(&existing) != hash(md.as_bytes()) => plan.report.gaps.push(format!(
+            "{to} already exists with content different from {from}; not overwritten"
+        )),
+        _ => plan.put(root, from, to, md.into_bytes()),
+    }
+    Ok(())
+}
+
 /// `.claude/*` is absorbed fully (new and edited); other agents' dirs only for new
 /// files, since their generated form drops fields the source keeps.
 fn copy_items(root: &Path, plan: &mut Plan) -> Result<()> {
@@ -304,8 +336,20 @@ fn copy_items(root: &Path, plan: &mut Plan) -> Result<()> {
                 continue;
             }
             let known = plan.lock.files.contains_key(&from) || plan.rendered.contains_key(&from);
-            if dir.starts_with(".claude/") || !known {
-                copy_in(root, &from, &format!("{TEMPA_DIR}/{kind}/{rel}"), plan)?;
+            // Copilot names agents `<x>.agent.md`; Codex agents are TOML.
+            let rel = match dir {
+                ".github/agents" => rel.strip_suffix(".agent.md").map(|s| format!("{s}.md")),
+                ".codex/agents" => rel.strip_suffix(".toml").map(|s| format!("{s}.md")),
+                _ => None,
+            }
+            .unwrap_or(rel);
+            let to = format!("{TEMPA_DIR}/{kind}/{rel}");
+            if dir == ".codex/agents" {
+                if !known {
+                    codex_agent_in(root, &from, &to, plan)?;
+                }
+            } else if dir.starts_with(".claude/") || !known {
+                copy_in(root, &from, &to, plan)?;
             }
         }
     }

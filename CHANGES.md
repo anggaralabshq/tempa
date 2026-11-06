@@ -271,3 +271,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-absorb-new-agent-dirs
+- Summary: Import absorbs hand-written Copilot and Codex agents; clear advice for .github/skills
+- Reason: m4 review: files in the new tempa-owned dirs failed tempa check with no way out
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

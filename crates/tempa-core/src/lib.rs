@@ -6,6 +6,7 @@ pub mod contract;
 pub mod date;
 pub mod gitx;
 pub mod import;
+pub mod init;
 pub mod md;
 pub mod source;
 pub mod sync;

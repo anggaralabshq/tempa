@@ -1,0 +1,3 @@
+#!/bin/sh
+# Dipasang tempa init: kontrak + harness sebelum push.
+exec tempa check

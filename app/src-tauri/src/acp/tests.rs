@@ -1,5 +1,6 @@
 //! Against `tests/fake-agent.mjs` (needs `node`; CI has it).
 
+use super::agents::{self, AGENTS, Launch};
 use super::conn::{Conn, Handlers};
 use super::session::{McpLaunch, ModelVia, Session, models};
 use serde_json::{Value, json};
@@ -232,3 +233,51 @@ fn models_prefer_config_option() {
     assert!(matches!(models(&json!({})).via, ModelVia::None));
 }
 
+#[test]
+fn resolve_reports_missing_binary_with_hint() {
+    let cursor = AGENTS.iter().find(|a| a.id == "cursor").unwrap();
+    let err = agents::resolve(cursor, Some("/nonexistent")).unwrap_err();
+    assert!(
+        err.contains("Cursor") && err.contains("not installed"),
+        "{err}"
+    );
+    let claude = AGENTS.iter().find(|a| a.id == "claude").unwrap();
+    assert!(matches!(claude.launch, Launch::Npx { .. }));
+    let path = std::env::var("PATH").ok();
+    let (prog, args) = agents::resolve(claude, path.as_deref()).unwrap();
+    assert!(prog.to_string_lossy().contains("npx"));
+    assert_eq!(
+        &args[..2],
+        ["-y", "@agentclientprotocol/claude-agent-acp@0.101.0"]
+    );
+}
+
+#[test]
+fn cancel_answers_pending_permission_cancelled() {
+    use super::chat::ChatManager;
+    let (tx, rx) = mpsc::channel::<Value>();
+    let m = ChatManager::default();
+    let started = m
+        .start_with(
+            &node(),
+            &fake_args(),
+            Path::new(env!("CARGO_MANIFEST_DIR")),
+            None,
+            mcp(),
+            std::sync::Arc::new(move |e: Value| {
+                let _ = tx.send(e);
+            }),
+        )
+        .unwrap();
+    m.prompt(started.id, "edit src/a.ts").unwrap();
+    let ev = rx.iter().find(|e| e["type"] == "permission").unwrap();
+    assert_eq!(ev["toolCall"]["kind"], "edit");
+    m.cancel(started.id);
+    let said = rx
+        .iter()
+        .find_map(|e| e["update"]["content"]["text"].as_str().map(String::from))
+        .unwrap();
+    assert_eq!(said, r#"{"outcome":"cancelled"}"#);
+    assert!(rx.iter().any(|e| e["type"] == "turn_end"));
+    m.stop_all();
+}

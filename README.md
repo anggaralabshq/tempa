@@ -93,7 +93,7 @@ Upgrading a repo that already has its own `.mcp.json`, `.cursor/mcp.json`, `open
 - Edit the source, not generated files. If you did edit a generated file, `tempa import --yes` absorbs it; `tempa sync --force` discards it.
 - The pre-commit hook only syncs from staged sources, so a commit never contains generated output for work you have not staged.
 - Plans are approved by a person (`tempa task approve`), never by an agent.
-- Configure the gates in `tempa.toml`: `[harness]` commands (format, lint, test), protected paths, required decisions, maximum diff size.
+- Configure the gates in `tempa.toml`: `[harness]` commands (format, lint, test), protected paths, required decisions, maximum diff size. Generated files and dependency lockfiles (`Cargo.lock`, `bun.lock`, `package-lock.json`, ...) do not count toward the diff size.
 
 ## CI
 

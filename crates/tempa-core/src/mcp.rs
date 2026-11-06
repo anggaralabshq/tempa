@@ -1,21 +1,22 @@
 //! `tempa mcp`: a stdio MCP server (JSON-RPC 2.0, one message per line) that serves
-//! the contract to any agent.
+//! the contract to any agent and validates the documents agents write.
 
 use crate::check::{CheckOpts, check};
 use crate::config::Config;
-use crate::contract::parse_changes;
-use crate::md::split_front;
+use crate::contract::{parse_changes, require_headings};
+use crate::md::{set_section, split_front};
 use crate::source::{self, Item, front_get};
-use crate::task;
-use crate::{Severity, gitx, sync};
-use serde_json::{Value, json};
+use crate::task::{self, LogEntry};
+use crate::{Severity, gitx, sync, write_atomic};
+use serde_json::{Map, Value, json};
 use std::path::Path;
 
 /// Newest first; an unknown requested version gets the newest.
 pub const PROTOCOL_VERSIONS: [&str; 4] = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
-const INSTRUCTIONS: &str = "Project contract server. Call tempa_context before starting work \
-and tempa_check before you finish. A person approves plans (tempa task approve), never the agent.";
+const INSTRUCTIONS: &str = "Project contract server. Call tempa_context before starting work. \
+Write plans, decisions and changes entries with tempa_plan, tempa_decide and tempa_log_change; \
+run tempa_check before you finish. A person approves plans (tempa task approve), never the agent.";
 
 type ToolResult = std::result::Result<String, String>;
 
@@ -92,6 +93,8 @@ fn schema(props: Value, required: &[&str]) -> Value {
 }
 
 fn tools() -> Vec<Value> {
+    let sections = json!({"type": "object", "additionalProperties": {"type": "string"},
+        "description": "Heading → markdown body. Headings must be the document's required headings."});
     vec![
         json!({"name": "tempa_context", "description": "Project contract: AGENTS.md, commands, subagents, skills, rules (protected paths, harness, required headings) and the active plan. Use it to read commands or subagents your agent cannot load natively.",
             "inputSchema": schema(json!({
@@ -99,6 +102,16 @@ fn tools() -> Vec<Value> {
                 "name": {"type": "string", "description": "Return the full text of one command, subagent or skill"}}), &[])}),
         json!({"name": "tempa_status", "description": "Current task (from the branch), plan state, changes entries and drift, as JSON.",
             "inputSchema": schema(json!({}), &[])}),
+        json!({"name": "tempa_plan", "description": "Fill or replace sections of the current task's plan. Does not approve it: a person runs `tempa task approve`.",
+            "inputSchema": schema(json!({"sections": sections}), &["sections"])}),
+        json!({"name": "tempa_decide", "description": "Create a decision record. Every required heading must be filled.",
+            "inputSchema": schema(json!({"slug": {"type": "string", "description": "lowercase-with-hyphens"}, "sections": sections}), &["slug", "sections"])}),
+        json!({"name": "tempa_log_change", "description": "Append a changes entry for the current task. `agent` names the agent and model, e.g. \"codex / gpt-5\".",
+            "inputSchema": schema(json!({
+                "summary": {"type": "string"}, "reason": {"type": "string"},
+                "decision": {"type": "string", "description": "Path of the related decision, if any"},
+                "harness": {"type": "string", "enum": ["pass", "fail", "pending"]},
+                "agent": {"type": "string"}}), &["summary", "reason", "harness", "agent"])}),
         json!({"name": "tempa_check", "description": "Run tempa check (drift, contract documents, task rules) and return the findings as JSON. Set harness to true to also run the [harness] commands, which can take minutes.",
             "inputSchema": schema(json!({"harness": {"type": "boolean"}}), &[])}),
         json!({"name": "tempa_pr_body", "description": "Pull request body for the current task.",
@@ -111,6 +124,9 @@ fn call(root: &Path, name: &str, args: &Value) -> ToolResult {
     match name {
         "tempa_context" => context(root, args),
         "tempa_status" => status(root),
+        "tempa_plan" => plan(root, args),
+        "tempa_decide" => decide(root, args),
+        "tempa_log_change" => log_change(root, args),
         "tempa_check" => {
             // Harness commands can take minutes; MCP clients time out tool calls.
             let harness = match &args["harness"] {
@@ -231,7 +247,7 @@ fn context(root: &Path, args: &Value) -> ToolResult {
             s += &format!("- {doc}: {}\n", list.join(", "));
         }
         s += &format!(
-            "\nChanges entries ({}) are written with `tempa log`.\n",
+            "\nChanges entries ({}) are written with tempa_log_change.\n",
             d.changes
         );
         s
@@ -297,4 +313,144 @@ fn status(root: &Path) -> ToolResult {
         .collect();
     let v = json!({"task_id": id, "branch": branch, "plan": plan, "state": state, "changes_entries": entries, "drift": drift});
     Ok(serde_json::to_string_pretty(&v).expect("json serializes"))
+}
+
+/// Map `sections` keys onto `allowed` headings (case-insensitive). Unknown keys → error.
+fn canonical(
+    sections: &Value,
+    allowed: &[String],
+) -> std::result::Result<Vec<(String, String)>, String> {
+    let map: &Map<String, Value> = sections
+        .as_object()
+        .ok_or("`sections` must be an object of heading → text")?;
+    let mut out = Vec::new();
+    let mut unknown = Vec::new();
+    for (k, v) in map {
+        let Some(a) = allowed.iter().find(|a| a.eq_ignore_ascii_case(k.trim())) else {
+            unknown.push(k.clone());
+            continue;
+        };
+        if out.iter().any(|(t, _): &(String, String)| t == a) {
+            return Err(format!("section {a} is given more than once"));
+        }
+        let body = v
+            .as_str()
+            .filter(|b| !b.trim().is_empty())
+            .ok_or_else(|| format!("section {a} must be non-empty markdown text"))?;
+        check_body(a, body)?;
+        out.push((a.clone(), body.to_string()));
+    }
+    if !unknown.is_empty() {
+        return Err(format!(
+            "unknown section(s): {}; allowed: {}",
+            unknown.join(", "),
+            allowed.join(", ")
+        ));
+    }
+    Ok(out)
+}
+
+/// A body must not end the section early: no `#`/`##` headings and no unclosed fence.
+fn check_body(title: &str, body: &str) -> std::result::Result<(), String> {
+    let mut fence: Option<&str> = None;
+    for line in body.lines() {
+        let t = line.trim_start();
+        let marker = ["```", "~~~"].into_iter().find(|m| t.starts_with(m));
+        match (fence, marker) {
+            (None, Some(m)) => fence = Some(m),
+            (Some(f), Some(m)) if f == m => fence = None,
+            (None, None) => {
+                let hashes = t.chars().take_while(|c| *c == '#').count();
+                let rest = &t[hashes..];
+                if (1..=2).contains(&hashes) && (rest.is_empty() || rest.starts_with(' ')) {
+                    return Err(format!(
+                        "section {title}: line \"{line}\" is a heading; use ### or deeper inside a section"
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+    match fence {
+        Some(f) => Err(format!("section {title}: code fence {f} is not closed")),
+        None => Ok(()),
+    }
+}
+
+fn apply(mut md: String, sections: &[(String, String)]) -> String {
+    for (title, body) in sections {
+        md = match set_section(&md, title, body) {
+            Some(s) => s,
+            None => format!("{}\n## {title}\n\n{}\n", md.trim_end(), body.trim()),
+        };
+    }
+    md
+}
+
+fn plan(root: &Path, args: &Value) -> ToolResult {
+    let id = task_id(root)?;
+    let cfg = Config::load(root).map_err(|e| e.0)?;
+    let sections = canonical(&args["sections"], &cfg.headings.plan)?;
+    let path = task::plan_path(&cfg, &id);
+    let text =
+        std::fs::read_to_string(root.join(&path)).map_err(|_| format!("{path} not found"))?;
+    let (front, body) = split_front(&text);
+    let front = front
+        .map(|f| format!("---\n{}---\n", f.raw))
+        .unwrap_or_default();
+    let out = front + &apply(body.to_string(), &sections);
+    write_atomic(&root.join(&path), out.as_bytes()).map_err(|e| e.0)?;
+    let empty: Vec<String> = require_headings(&out, &cfg.headings.plan)
+        .into_iter()
+        .map(|(h, _)| h)
+        .collect();
+    let rest = if empty.is_empty() {
+        "all required headings filled".to_string()
+    } else {
+        format!("still empty: {}", empty.join(", "))
+    };
+    Ok(format!(
+        "updated {path}; {rest}. A person approves the plan with `tempa task approve`."
+    ))
+}
+
+fn decide(root: &Path, args: &Value) -> ToolResult {
+    let cfg = Config::load(root).map_err(|e| e.0)?;
+    let slug = args["slug"].as_str().ok_or("`slug` is required")?;
+    let sections = canonical(&args["sections"], &cfg.headings.decisions)?;
+    let missing: Vec<&String> = cfg
+        .headings
+        .decisions
+        .iter()
+        .filter(|h| {
+            !sections
+                .iter()
+                .any(|(t, b)| t == *h && !b.trim().is_empty())
+        })
+        .collect();
+    if !missing.is_empty() {
+        let list: Vec<&str> = missing.iter().map(|s| s.as_str()).collect();
+        return Err(format!(
+            "every decision heading is required; missing: {}",
+            list.join(", ")
+        ));
+    }
+    let path = task::decide(root, slug).map_err(|e| e.0)?;
+    let text = std::fs::read_to_string(root.join(&path)).map_err(|e| e.to_string())?;
+    write_atomic(&root.join(&path), apply(text, &sections).as_bytes()).map_err(|e| e.0)?;
+    Ok(path)
+}
+
+fn log_change(root: &Path, args: &Value) -> ToolResult {
+    let id = task_id(root)?;
+    let s = |k: &str| args[k].as_str().unwrap_or_default().to_string();
+    let entry = LogEntry {
+        summary: s("summary"),
+        reason: s("reason"),
+        decision: args["decision"].as_str().map(String::from),
+        harness: s("harness"),
+        agent: s("agent"),
+    };
+    task::log(root, &entry).map_err(|e| e.0)?;
+    Ok(format!("changes entry added for {id}"))
 }

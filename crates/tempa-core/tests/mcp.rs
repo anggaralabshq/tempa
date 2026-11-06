@@ -1,6 +1,6 @@
 //! M3-lite: `tempa mcp` protocol and tools.
 mod common;
-use common::{read, valid_repo, write};
+use common::{git, read, valid_repo, write};
 use serde_json::{Value, json};
 use tempa_core::mcp::{PROTOCOL_VERSIONS, handle, handle_line};
 use tempa_core::task::task_new;
@@ -102,6 +102,9 @@ fn tools_list_names() {
         [
             "tempa_context",
             "tempa_status",
+            "tempa_plan",
+            "tempa_decide",
+            "tempa_log_change",
             "tempa_check",
             "tempa_pr_body"
         ]
@@ -193,6 +196,184 @@ fn check_returns_structured_findings() {
             .any(|f| f["code"] == "contract.missing_heading" && f["severity"] == "error"),
         "{text}"
     );
+}
+
+// ---- Task 3: write tools ----
+
+#[test]
+fn plan_updates_given_sections_only() {
+    let d = valid_repo();
+    let id = task_new(d.path(), "x").unwrap();
+    let path = format!("docs/plans/{id}.md");
+    let before = read(d.path(), &path);
+    let (err, text) = call(
+        d.path(),
+        "tempa_plan",
+        json!({"sections": {"tujuan": "Tambah invoice.", "Risiko": "Rendah."}}),
+    );
+    assert!(!err, "{text}");
+    let after = read(d.path(), &path);
+    assert!(
+        after.contains("## Tujuan\n\nTambah invoice.\n") && after.contains("Rendah."),
+        "{after}"
+    );
+    assert!(
+        text.contains("Langkah"),
+        "lists still-empty headings: {text}"
+    );
+    let front = |s: &str| s.split("---").nth(1).unwrap().to_string();
+    assert_eq!(front(&before), front(&after));
+}
+
+#[test]
+fn plan_rejects_unknown_section_without_writing() {
+    let d = valid_repo();
+    let id = task_new(d.path(), "x").unwrap();
+    let path = format!("docs/plans/{id}.md");
+    let before = read(d.path(), &path);
+    let (err, text) = call(
+        d.path(),
+        "tempa_plan",
+        json!({"sections": {"Tujuan": "a", "Bonus": "b"}}),
+    );
+    assert!(
+        err && text.contains("Bonus") && text.contains("Tujuan"),
+        "{text}"
+    );
+    assert_eq!(read(d.path(), &path), before);
+}
+
+#[test]
+fn plan_off_task_branch_is_error() {
+    let d = valid_repo();
+    let (err, text) = call(d.path(), "tempa_plan", json!({"sections": {"Tujuan": "a"}}));
+    assert!(err && text.contains("tempa task new"), "{text}");
+}
+
+#[test]
+fn plan_cannot_touch_approval() {
+    let d = valid_repo();
+    task_new(d.path(), "x").unwrap();
+    let (err, _) = call(
+        d.path(),
+        "tempa_plan",
+        json!({"sections": {"state": "approved"}}),
+    );
+    assert!(err);
+}
+
+#[test]
+fn decide_requires_all_sections() {
+    let d = valid_repo();
+    let (err, text) = call(
+        d.path(),
+        "tempa_decide",
+        json!({"slug": "pakai-sqlite", "sections": {"Konteks": "a"}}),
+    );
+    assert!(err && text.contains("Opsi"), "{text}");
+    assert!(
+        std::fs::read_dir(d.path().join("docs/decisions"))
+            .unwrap()
+            .all(|e| !e
+                .unwrap()
+                .file_name()
+                .to_string_lossy()
+                .contains("pakai-sqlite"))
+    );
+    let all = json!({"Konteks": "a", "Opsi": "b", "Keputusan": "c", "Konsekuensi": "d", "Agent + model": "codex / gpt-5"});
+    let (err, text) = call(
+        d.path(),
+        "tempa_decide",
+        json!({"slug": "pakai-sqlite", "sections": all}),
+    );
+    assert!(!err, "{text}");
+    assert!(
+        read(d.path(), text.trim()).contains("## Keputusan\n\nc\n"),
+        "{text}"
+    );
+}
+
+#[test]
+fn log_change_validates_one_line() {
+    let d = valid_repo();
+    task_new(d.path(), "x").unwrap();
+    let (err, text) = call(
+        d.path(),
+        "tempa_log_change",
+        json!({"summary": "a\nb", "reason": "r", "harness": "pass", "agent": "codex / gpt-5"}),
+    );
+    assert!(err && text.contains("--summary"), "{text}");
+    let (err, text) = call(
+        d.path(),
+        "tempa_log_change",
+        json!({"summary": "s", "reason": "r", "harness": "pass", "agent": "codex / gpt-5"}),
+    );
+    assert!(!err, "{text}");
+    assert!(read(d.path(), "CHANGES.md").contains("- Agent: codex / gpt-5"));
+    git(d.path(), &["status", "--porcelain"]);
+}
+
+// ---- final review fixes ----
+
+fn plan_text(p: &std::path::Path) -> String {
+    let cfg = tempa_core::config::Config::load(p).unwrap();
+    let id = tempa_core::task::current_task_id(p).unwrap();
+    read(p, &tempa_core::task::plan_path(&cfg, &id))
+}
+
+// I3: an array/null/empty value must not erase a filled section.
+#[test]
+fn plan_rejects_non_string_or_empty_values() {
+    let d = valid_repo();
+    task_new(d.path(), "x").unwrap();
+    let (err, _) = call(d.path(), "tempa_plan", json!({"sections": {"Tujuan": "a"}}));
+    assert!(!err);
+    let before = plan_text(d.path());
+    for bad in [json!(["a", "b"]), json!(null), json!(""), json!("  ")] {
+        let (err, text) = call(d.path(), "tempa_plan", json!({"sections": {"Tujuan": bad}}));
+        assert!(err, "{bad}: {text}");
+        assert!(text.contains("Tujuan"), "{text}");
+    }
+    assert_eq!(plan_text(d.path()), before);
+}
+
+// I3: keys that differ only by case must not slip past the all-headings check.
+#[test]
+fn decide_rejects_case_duplicate_keys() {
+    let d = valid_repo();
+    task_new(d.path(), "x").unwrap();
+    let (err, text) = call(
+        d.path(),
+        "tempa_decide",
+        json!({"slug": "dup", "sections": {
+            "Konteks": "c", "konteks": "", "Opsi": "o", "Keputusan": "k",
+            "Konsekuensi": "s", "Agent + model": "a"}}),
+    );
+    assert!(err, "{text}");
+    assert!(
+        !d.path()
+            .join("docs/decisions")
+            .read_dir()
+            .unwrap()
+            .any(|e| { e.unwrap().file_name().to_string_lossy().contains("dup") })
+    );
+}
+
+// M3 (graded Important): a body must not inject headings that break the document.
+#[test]
+fn plan_rejects_headings_and_open_fences_in_bodies() {
+    let d = valid_repo();
+    task_new(d.path(), "x").unwrap();
+    let before = plan_text(d.path());
+    for bad in ["x\n## Langkah\ny", "# Title", "```\nunclosed"] {
+        let (err, text) = call(d.path(), "tempa_plan", json!({"sections": {"Tujuan": bad}}));
+        assert!(err, "{bad:?}: {text}");
+    }
+    assert_eq!(plan_text(d.path()), before);
+    let ok = "x\n### Detail\n```\n## not a heading\n```";
+    let (err, text) = call(d.path(), "tempa_plan", json!({"sections": {"Tujuan": ok}}));
+    assert!(!err, "{text}");
+    assert!(plan_text(d.path()).contains("### Detail"));
 }
 
 // I4: harness commands (minutes long) run only when asked; bad argument types are errors.

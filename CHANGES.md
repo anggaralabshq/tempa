@@ -97,3 +97,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-lf-checkout
+- Summary: Force LF checkouts so templates and fixtures match on Windows
+- Reason: Milestone CI: autocrlf checkouts produced CRLF plan templates and fixtures
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

@@ -74,3 +74,19 @@ fn missing_config_exit_2() {
     assert_eq!(o.status.code(), Some(2));
     assert!(stdout(&o).contains("tempa init"));
 }
+
+#[test]
+fn import_dry_run_then_yes() {
+    let d = tempfile::tempdir().unwrap();
+    write(d.path(), "CLAUDE.md", "# Proyek\n\n## Stack\n\nGo.\n");
+    write(d.path(), ".claude/commands/review.md", "---\ndescription: R\n---\nreview\n");
+    let o = tempa(d.path(), &["import"]);
+    assert_eq!(o.status.code(), Some(0));
+    assert!(stdout(&o).contains("--yes"), "{}", stdout(&o));
+    assert!(!d.path().join("AGENTS.md").exists());
+    let o = tempa(d.path(), &["import", "--yes"]);
+    assert_eq!(o.status.code(), Some(0), "{}", stdout(&o));
+    assert!(stdout(&o).contains("synced CLAUDE.md"), "{}", stdout(&o));
+    assert!(std::fs::read_to_string(d.path().join("CLAUDE.md")).unwrap().contains("@AGENTS.md"));
+    assert_eq!(tempa(d.path(), &["sync", "--check"]).status.code(), Some(0));
+}

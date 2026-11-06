@@ -2,6 +2,7 @@
 
 pub mod config;
 pub mod date;
+pub mod import;
 pub mod md;
 pub mod source;
 pub mod sync;

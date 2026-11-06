@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::Path;
 use std::process::{Command, ExitCode};
-use tempa_core::{Finding, Severity, sync};
+use tempa_core::{Finding, Severity, import, sync};
 
 #[derive(Parser)]
 #[command(name = "tempa", version, about = "Satu kontrak konteks untuk semua coding agent")]
@@ -21,6 +21,31 @@ enum Cmd {
         #[arg(long)]
         fix: bool,
     },
+    /// Serap .claude/, CLAUDE.md, .cursorrules, dll. ke sumber netral, lalu sync
+    Import {
+        /// Tulis perubahan (tanpa flag ini hanya laporan)
+        #[arg(long)]
+        yes: bool,
+    },
+}
+
+fn print_import(r: &import::ImportReport) {
+    for p in &r.written {
+        println!("ditulis: {p}");
+    }
+    for p in &r.merged_from {
+        println!("digabung dari: {p}");
+    }
+    println!("paragraf duplikat dilewati: {}", r.duplicates_skipped);
+    for (n, c) in &r.harness_added {
+        println!("harness ditambahkan: {n} = {c}");
+    }
+    for g in &r.protected_added {
+        println!("protected_paths ditambahkan: {g}");
+    }
+    for g in &r.gaps {
+        println!("gap: {g}");
+    }
 }
 
 /// Print findings; return whether any is an error.
@@ -67,6 +92,18 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
             }
             git_add(root, &changed)?;
             for p in &changed {
+                println!("synced {p}");
+            }
+            Ok(false)
+        }
+        Cmd::Import { yes } => {
+            let report = import::import(root, yes)?;
+            print_import(&report);
+            if !yes {
+                println!("Jalankan ulang dengan --yes untuk menulis.");
+                return Ok(false);
+            }
+            for p in sync::sync(root)? {
                 println!("synced {p}");
             }
             Ok(false)

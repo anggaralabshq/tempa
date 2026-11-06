@@ -1,11 +1,12 @@
 name: app (windows)
 
+# Once per milestone: task PRs target a milestone branch (local checks gate them);
+# the milestone PR into main runs this. workflow_dispatch runs it by hand.
 on:
   pull_request:
-    paths: ["app/**", "crates/tempa-core/**", ".github/workflows/app-windows.yml"]
-  push:
     branches: [main]
     paths: ["app/**", "crates/tempa-core/**", ".github/workflows/app-windows.yml"]
+  workflow_dispatch:
 
 jobs:
   test:

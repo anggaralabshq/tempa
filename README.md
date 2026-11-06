@@ -16,10 +16,11 @@ Supported agents: Claude Code, Codex, Gemini CLI, OpenCode, Cursor, GitHub Copil
 ## Install
 
 ```sh
-cargo install --path crates/tempa-cli --locked
+brew install anggaralabshq/tap/tempa     # macOS, Linux
+cargo install tempa-cli --locked         # any platform with Rust 1.85+
 ```
 
-Requires Rust 1.85+ and git. Prebuilt binaries are not published yet.
+Or download a binary for macOS, Linux or Windows from [Releases](https://github.com/anggaralabshq/tempa/releases). tempa needs git on PATH. From a clone: `cargo install --path crates/tempa-cli --locked`.
 
 ## Quick start
 

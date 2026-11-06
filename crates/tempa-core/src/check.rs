@@ -50,7 +50,10 @@ pub fn check(root: &Path, opts: &CheckOpts) -> Result<Vec<Finding>> {
             f.push(Finding::error(
                 "version.mismatch",
                 Some(crate::config::FILE.into()),
-                format!("tempa.toml mengunci versi {v}, binary ini {}", env!("CARGO_PKG_VERSION")),
+                format!(
+                    "tempa.toml mengunci versi {v}, binary ini {}",
+                    env!("CARGO_PKG_VERSION")
+                ),
             ));
         }
     }
@@ -64,11 +67,13 @@ pub fn check(root: &Path, opts: &CheckOpts) -> Result<Vec<Finding>> {
             "branch dasar {base_name} tidak ditemukan atau riwayat tidak cukup; aturan task dilewati. \
              Di Bitbucket Pipelines pakai `clone: depth: full`"
         );
-        f.push(if std::env::var("BITBUCKET_PR_ID").is_ok_and(|v| !v.is_empty()) {
-            Finding::error("git.base_unavailable", None, msg)
-        } else {
-            Finding::warning("git.base_unavailable", None, msg)
-        });
+        f.push(
+            if std::env::var("BITBUCKET_PR_ID").is_ok_and(|v| !v.is_empty()) {
+                Finding::error("git.base_unavailable", None, msg)
+            } else {
+                Finding::warning("git.base_unavailable", None, msg)
+            },
+        );
     }
     let on_base = gitx::current_branch(root).is_ok_and(|b| b == base_name);
     let range = base.filter(|_| !on_base);
@@ -108,20 +113,39 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
     let id = if let Some(id) = branch.strip_prefix("tempa/") {
         let plan = format!("{plan_dir}{id}.md");
         if !root.join(&plan).is_file() {
-            f.push(Finding::error("task.no_plan", Some(plan), format!("branch {branch} belum punya file plan")));
+            f.push(Finding::error(
+                "task.no_plan",
+                Some(plan),
+                format!("branch {branch} belum punya file plan"),
+            ));
         }
         Some(id.to_string())
     } else {
-        let plans: Vec<&String> = changed.iter().filter(|p| p.starts_with(&plan_dir) && p.ends_with(".md")).collect();
+        let plans: Vec<&String> = changed
+            .iter()
+            .filter(|p| p.starts_with(&plan_dir) && p.ends_with(".md"))
+            .collect();
         match plans.as_slice() {
             [] => {
-                f.push(Finding::error("task.no_plan", None, format!("PR ini tidak menambah/mengubah plan di {plan_dir}")));
+                f.push(Finding::error(
+                    "task.no_plan",
+                    None,
+                    format!("PR ini tidak menambah/mengubah plan di {plan_dir}"),
+                ));
                 None
             }
             [one] => Some(one[plan_dir.len()..one.len() - 3].to_string()),
             many => {
-                let list = many.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", ");
-                f.push(Finding::error("task.multiple_plans", None, format!("satu PR satu task; plan berubah: {list}")));
+                let list = many
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                f.push(Finding::error(
+                    "task.multiple_plans",
+                    None,
+                    format!("satu PR satu task; plan berubah: {list}"),
+                ));
                 None
             }
         }
@@ -146,7 +170,9 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
         .iter()
         .map(String::as_str)
         .filter(|t| match *t {
-            "new-dependency" => changed.iter().any(|p| MANIFESTS.contains(&file_name(p).as_str())),
+            "new-dependency" => changed
+                .iter()
+                .any(|p| MANIFESTS.contains(&file_name(p).as_str())),
             "schema-change" => changed.iter().any(|p| schema.is_match(p)),
             "public-api" => changed.iter().any(|p| api.is_match(p)),
             _ => false,
@@ -154,11 +180,17 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
         .collect();
     if !triggers.is_empty() {
         let dec_dir = dir(&cfg.docs.decisions);
-        if !gitx::added_files(root, base)?.iter().any(|p| p.starts_with(&dec_dir) && p.ends_with(".md")) {
+        if !gitx::added_files(root, base)?
+            .iter()
+            .any(|p| p.starts_with(&dec_dir) && p.ends_with(".md"))
+        {
             f.push(Finding::error(
                 "task.decision_required",
                 None,
-                format!("perubahan memicu {}; tambahkan decision baru (tempa decide)", triggers.join(", ")),
+                format!(
+                    "perubahan memicu {}; tambahkan decision baru (tempa decide)",
+                    triggers.join(", ")
+                ),
             ));
         }
     }
@@ -170,7 +202,10 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
         f.push(Finding::error(
             "task.diff_too_large",
             None,
-            format!("diff {lines} baris melebihi max_diff_lines {}; pecah task", g.max_diff_lines),
+            format!(
+                "diff {lines} baris melebihi max_diff_lines {}; pecah task",
+                g.max_diff_lines
+            ),
         ));
     }
     Ok(f)
@@ -180,14 +215,27 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
 pub fn run_harness(root: &Path, cfg: &Config) -> Result<Vec<Finding>> {
     for (name, cmd) in &cfg.harness {
         let status = if cfg!(windows) {
-            Command::new("cmd").args(["/C", cmd]).current_dir(root).status()
+            Command::new("cmd")
+                .args(["/C", cmd])
+                .current_dir(root)
+                .status()
         } else {
-            Command::new("sh").args(["-c", cmd]).current_dir(root).status()
+            Command::new("sh")
+                .args(["-c", cmd])
+                .current_dir(root)
+                .status()
         }
         .map_err(|e| Error(format!("harness {name} tidak bisa dijalankan: {e}")))?;
         if !status.success() {
-            let code = status.code().map(|c| c.to_string()).unwrap_or_else(|| "signal".into());
-            return Ok(vec![Finding::error("harness.failed", Some(name.clone()), format!("`{cmd}` gagal (exit {code})"))]);
+            let code = status
+                .code()
+                .map(|c| c.to_string())
+                .unwrap_or_else(|| "signal".into());
+            return Ok(vec![Finding::error(
+                "harness.failed",
+                Some(name.clone()),
+                format!("`{cmd}` gagal (exit {code})"),
+            )]);
         }
     }
     Ok(vec![])

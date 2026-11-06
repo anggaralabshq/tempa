@@ -128,7 +128,11 @@ pub fn sections(md: &str) -> Vec<Section> {
                 .find(|(_, l, _)| l <= level)
                 .map(|(j, _, _)| *j)
                 .unwrap_or(lines.len());
-            Section { title: title.clone(), level: *level, body: lines[i + 1..end].join("\n") }
+            Section {
+                title: title.clone(),
+                level: *level,
+                body: lines[i + 1..end].join("\n"),
+            }
         })
         .collect()
 }
@@ -161,7 +165,10 @@ mod tests {
     #[test]
     fn front_parses_crlf() {
         let (f, body) = split_front("---\r\ndescription: Review diff\r\n---\r\nHalo\r\n");
-        assert_eq!(f.unwrap().pairs, vec![("description".to_string(), "Review diff".to_string())]);
+        assert_eq!(
+            f.unwrap().pairs,
+            vec![("description".to_string(), "Review diff".to_string())]
+        );
         assert_eq!(normalize_eol(body), "Halo\n");
     }
 
@@ -181,7 +188,10 @@ mod tests {
     #[test]
     fn sections_ignore_code_fence() {
         let s = sections("## Stack\nRust\n```\n# bukan heading\n```\n## Perintah\n\n");
-        assert_eq!(s.iter().map(|x| x.title.as_str()).collect::<Vec<_>>(), ["Stack", "Perintah"]);
+        assert_eq!(
+            s.iter().map(|x| x.title.as_str()).collect::<Vec<_>>(),
+            ["Stack", "Perintah"]
+        );
         assert!(s[0].body.contains("# bukan heading"));
         assert_eq!(s[1].body.trim(), "");
     }
@@ -204,6 +214,9 @@ mod tests {
 
     #[test]
     fn paragraphs_split_on_blank_lines() {
-        assert_eq!(paragraphs("a\nb\n\n\nc\n"), vec!["a\nb".to_string(), "c".to_string()]);
+        assert_eq!(
+            paragraphs("a\nb\n\n\nc\n"),
+            vec!["a\nb".to_string(), "c".to_string()]
+        );
     }
 }

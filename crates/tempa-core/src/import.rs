@@ -32,11 +32,16 @@ struct Plan {
 }
 
 fn norm(p: &str) -> String {
-    p.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase()
+    p.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
 }
 
 fn read(root: &Path, rel: &str) -> Option<String> {
-    std::fs::read_to_string(root.join(rel)).ok().map(|s| normalize_eol(&s))
+    std::fs::read_to_string(root.join(rel))
+        .ok()
+        .map(|s| normalize_eol(&s))
 }
 
 enum Include {
@@ -49,10 +54,17 @@ enum Include {
 /// Personal files like `@~/.claude/notes.md` must never be copied into AGENTS.md.
 fn read_include(root: &Path, rel: &str) -> Include {
     let p = Path::new(rel);
-    if rel.starts_with('~') || p.is_absolute() || p.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+    if rel.starts_with('~')
+        || p.is_absolute()
+        || p.components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+    {
         return Include::Outside;
     }
-    let (Ok(base), Ok(full)) = (std::fs::canonicalize(root), std::fs::canonicalize(root.join(p))) else {
+    let (Ok(base), Ok(full)) = (
+        std::fs::canonicalize(root),
+        std::fs::canonicalize(root.join(p)),
+    ) else {
         return Include::Missing;
     };
     if !full.starts_with(&base) {
@@ -72,15 +84,22 @@ fn expand(root: &Path, text: &str, context: &str, gaps: &mut Vec<String>, from: 
         if t == HEADER_MD || t == format!("@{context}") {
             continue;
         }
-        if let Some(path) = t.strip_prefix('@').filter(|p| !p.is_empty() && !p.contains(char::is_whitespace)) {
+        if let Some(path) = t
+            .strip_prefix('@')
+            .filter(|p| !p.is_empty() && !p.contains(char::is_whitespace))
+        {
             match read_include(root, path) {
                 Include::Text(inc) => {
                     out.push_str(inc.trim_end());
                     out.push('\n');
                     continue;
                 }
-                Include::Missing => gaps.push(format!("{from}: @{path} tidak ditemukan, baris dibiarkan")),
-                Include::Outside => gaps.push(format!("{from}: @{path} di luar repo, tidak di-inline")),
+                Include::Missing => {
+                    gaps.push(format!("{from}: @{path} tidak ditemukan, baris dibiarkan"))
+                }
+                Include::Outside => {
+                    gaps.push(format!("{from}: @{path} di luar repo, tidak di-inline"))
+                }
             }
             out.push_str(line);
             out.push('\n');
@@ -98,15 +117,27 @@ fn merge_context(root: &Path, cfg: &Config, plan: &mut Plan) {
     let mut text = base.clone();
     let mut seen: HashSet<String> = paragraphs(&base).iter().map(|p| norm(p)).collect();
 
-    let mut sources: Vec<String> = ["CLAUDE.md", "GEMINI.md", ".cursorrules"].iter().map(|s| s.to_string()).collect();
+    let mut sources: Vec<String> = ["CLAUDE.md", "GEMINI.md", ".cursorrules"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
     if let Ok(rules) = walk(&root.join(".cursor/rules")) {
-        sources.extend(rules.into_iter().filter(|(r, _)| r.ends_with(".mdc")).map(|(r, _)| format!(".cursor/rules/{r}")));
+        sources.extend(
+            rules
+                .into_iter()
+                .filter(|(r, _)| r.ends_with(".mdc"))
+                .map(|(r, _)| format!(".cursor/rules/{r}")),
+        );
     }
     sources.push(".github/copilot-instructions.md".into());
 
     for rel in sources.iter().filter(|r| r.as_str() != ctx) {
         let Some(raw) = read(root, rel) else { continue };
-        let body = if rel.ends_with(".mdc") { split_front(&raw).1.to_string() } else { raw };
+        let body = if rel.ends_with(".mdc") {
+            split_front(&raw).1.to_string()
+        } else {
+            raw
+        };
         let r = &mut plan.report;
         let expanded = expand(root, &body, ctx, &mut r.gaps, rel);
         let mut fresh = Vec::new();
@@ -127,7 +158,10 @@ fn merge_context(root: &Path, cfg: &Config, plan: &mut Plan) {
             if !text.ends_with('\n') {
                 text.push('\n');
             }
-            text.push_str(&format!("\n## Imported from {rel}\n\n{}\n", fresh.join("\n\n")));
+            text.push_str(&format!(
+                "\n## Imported from {rel}\n\n{}\n",
+                fresh.join("\n\n")
+            ));
         }
     }
     if text != base {
@@ -144,13 +178,19 @@ fn copy_in(root: &Path, lock: &Lock, from: &str, to: &str, plan: &mut Plan) -> R
             return Ok(()); // untouched generated file
         }
         let text = String::from_utf8_lossy(&bytes);
-        let stripped = text.replacen(&format!("{HEADER_MD}\n"), "", 1).replacen(&format!("{HEADER_MD}\r\n"), "", 1);
+        let stripped = text.replacen(&format!("{HEADER_MD}\n"), "", 1).replacen(
+            &format!("{HEADER_MD}\r\n"),
+            "",
+            1,
+        );
         plan.files.insert(to.to_string(), stripped.into_bytes());
         return Ok(());
     }
     match std::fs::read(root.join(to)) {
         Ok(existing) if hash(&existing) == hash(&bytes) => {}
-        Ok(_) => plan.report.gaps.push(format!("{to} sudah ada dengan isi berbeda dari {from}; tidak ditimpa")),
+        Ok(_) => plan.report.gaps.push(format!(
+            "{to} sudah ada dengan isi berbeda dari {from}; tidak ditimpa"
+        )),
         Err(_) => {
             plan.files.insert(to.to_string(), bytes);
         }
@@ -161,7 +201,13 @@ fn copy_in(root: &Path, lock: &Lock, from: &str, to: &str, plan: &mut Plan) -> R
 fn copy_items(root: &Path, lock: &Lock, plan: &mut Plan) -> Result<()> {
     for kind in ["commands", "agents", "skills"] {
         for (rel, _) in walk(&root.join(".claude").join(kind))? {
-            copy_in(root, lock, &format!(".claude/{kind}/{rel}"), &format!("{TEMPA_DIR}/{kind}/{rel}"), plan)?;
+            copy_in(
+                root,
+                lock,
+                &format!(".claude/{kind}/{rel}"),
+                &format!("{TEMPA_DIR}/{kind}/{rel}"),
+                plan,
+            )?;
         }
     }
     Ok(())
@@ -175,41 +221,76 @@ fn classify(cmd: &str) -> Option<&'static str> {
         ("typecheck", &["tsc", "typecheck", "mypy"]),
         ("test", &["test", "jest", "vitest", "pytest"]),
     ];
-    GROUPS.iter().find(|(_, kws)| kws.iter().any(|k| cmd.contains(k))).map(|(n, _)| *n)
+    GROUPS
+        .iter()
+        .find(|(_, kws)| kws.iter().any(|k| cmd.contains(k)))
+        .map(|(n, _)| *n)
 }
 
 fn settings(root: &Path, lock: &Lock, cfg: &Config, plan: &mut Plan) -> Result<()> {
     let from = ".claude/settings.json";
-    let Ok(text) = std::fs::read_to_string(root.join(from)) else { return Ok(()) };
+    let Ok(text) = std::fs::read_to_string(root.join(from)) else {
+        return Ok(());
+    };
     let v: Value =
         serde_json::from_str(&text).map_err(|e| Error(format!("{from} bukan JSON valid: {e}")))?;
-    copy_in(root, lock, from, &format!("{TEMPA_DIR}/targets/{from}"), plan)?;
+    copy_in(
+        root,
+        lock,
+        from,
+        &format!("{TEMPA_DIR}/targets/{from}"),
+        plan,
+    )?;
     let r = &mut plan.report;
 
     let mut protected: BTreeSet<String> = cfg.gates.protected_paths.iter().cloned().collect();
-    for rule in v["permissions"]["deny"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+    for rule in v["permissions"]["deny"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str)
+    {
         let path = ["Edit(", "Write(", "MultiEdit(", "Read("]
             .iter()
             .find_map(|p| rule.strip_prefix(p))
             .and_then(|r| r.strip_suffix(')'));
         match path {
             Some(p) if !p.starts_with("//") && !p.starts_with('~') => {
-                let p = p.trim_start_matches("./").trim_start_matches('/').to_string();
+                let p = p
+                    .trim_start_matches("./")
+                    .trim_start_matches('/')
+                    .to_string();
                 if protected.insert(p.clone()) {
                     r.protected_added.push(p);
                 }
             }
-            _ => r.gaps.push(format!("deny rule {rule} tidak punya padanan lintas-agent")),
+            _ => r
+                .gaps
+                .push(format!("deny rule {rule} tidak punya padanan lintas-agent")),
         }
     }
 
     let mut harness: BTreeSet<String> = cfg.harness.iter().map(|(n, _)| n.clone()).collect();
-    let hooks = v["hooks"].as_object().into_iter().flatten().flat_map(|(_, groups)| {
-        groups.as_array().into_iter().flatten().flat_map(|g| g["hooks"].as_array().into_iter().flatten())
-    });
+    let hooks = v["hooks"]
+        .as_object()
+        .into_iter()
+        .flatten()
+        .flat_map(|(_, groups)| {
+            groups
+                .as_array()
+                .into_iter()
+                .flatten()
+                .flat_map(|g| g["hooks"].as_array().into_iter().flatten())
+        });
     for h in hooks.filter(|h| h["type"] == "command") {
-        let Some(cmd) = h["command"].as_str() else { continue };
-        let name = if cmd.contains("$CLAUDE") || cmd.contains("jq") || cmd.contains('|') { None } else { classify(cmd) };
+        let Some(cmd) = h["command"].as_str() else {
+            continue;
+        };
+        let name = if cmd.contains("$CLAUDE") || cmd.contains("jq") || cmd.contains('|') {
+            None
+        } else {
+            classify(cmd)
+        };
         match name {
             Some(n) if harness.insert(n.to_string()) => r.harness_added.push((n.to_string(), cmd.to_string())),
             Some(_) => {}
@@ -220,7 +301,14 @@ fn settings(root: &Path, lock: &Lock, cfg: &Config, plan: &mut Plan) -> Result<(
 }
 
 fn mcp_server(v: &Value) -> McpServer {
-    let strs = |x: &Value| x.as_array().into_iter().flatten().filter_map(Value::as_str).map(String::from).collect();
+    let strs = |x: &Value| {
+        x.as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(String::from)
+            .collect()
+    };
     McpServer {
         command: v["command"].as_str().map(String::from),
         args: strs(&v["args"]),
@@ -230,7 +318,10 @@ fn mcp_server(v: &Value) -> McpServer {
             .flatten()
             .filter_map(|(k, x)| x.as_str().map(|s| (k.clone(), s.to_string())))
             .collect(),
-        url: v["url"].as_str().or(v["httpUrl"].as_str()).map(String::from),
+        url: v["url"]
+            .as_str()
+            .or(v["httpUrl"].as_str())
+            .map(String::from),
     }
 }
 
@@ -242,8 +333,11 @@ fn mcp(root: &Path, plan: &mut Plan) -> Result<()> {
     };
     let mut added = false;
     for from in [".mcp.json", ".cursor/mcp.json", ".gemini/settings.json"] {
-        let Ok(text) = std::fs::read_to_string(root.join(from)) else { continue };
-        let v: Value = serde_json::from_str(&text).map_err(|e| Error(format!("{from} bukan JSON valid: {e}")))?;
+        let Ok(text) = std::fs::read_to_string(root.join(from)) else {
+            continue;
+        };
+        let v: Value = serde_json::from_str(&text)
+            .map_err(|e| Error(format!("{from} bukan JSON valid: {e}")))?;
         for (name, s) in v["mcpServers"].as_object().into_iter().flatten() {
             if !file.servers.contains_key(name) {
                 file.servers.insert(name.clone(), mcp_server(s));
@@ -285,7 +379,8 @@ pub fn import(root: &Path, apply: bool) -> Result<ImportReport> {
 
     let mut report = plan.report;
     report.written = plan.files.keys().cloned().collect();
-    if plan.create_config || !report.harness_added.is_empty() || !report.protected_added.is_empty() {
+    if plan.create_config || !report.harness_added.is_empty() || !report.protected_added.is_empty()
+    {
         report.written.push(config::FILE.to_string());
     }
     report.written.sort();

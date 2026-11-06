@@ -17,7 +17,13 @@ pub enum Agent {
 }
 
 impl Agent {
-    pub const ALL: [Agent; 5] = [Agent::Claude, Agent::Codex, Agent::Gemini, Agent::Opencode, Agent::Cursor];
+    pub const ALL: [Agent; 5] = [
+        Agent::Claude,
+        Agent::Codex,
+        Agent::Gemini,
+        Agent::Opencode,
+        Agent::Cursor,
+    ];
 
     pub fn name(&self) -> &'static str {
         match self {
@@ -77,7 +83,13 @@ impl Default for Headings {
         Headings {
             context: strings(&["Stack", "Perintah", "Konvensi", "Area terlarang"]),
             plan: strings(&["Tujuan", "Langkah", "File yang disentuh", "Risiko"]),
-            decisions: strings(&["Konteks", "Opsi", "Keputusan", "Konsekuensi", "Agent + model"]),
+            decisions: strings(&[
+                "Konteks",
+                "Opsi",
+                "Keputusan",
+                "Konsekuensi",
+                "Agent + model",
+            ]),
             harness: strings(&["Definisi selesai", "Gate yang berlaku"]),
         }
     }
@@ -91,7 +103,9 @@ pub struct Agents {
 
 impl Default for Agents {
     fn default() -> Self {
-        Agents { enabled: Agent::ALL.to_vec() }
+        Agents {
+            enabled: Agent::ALL.to_vec(),
+        }
     }
 }
 
@@ -177,12 +191,15 @@ impl Config {
     }
 
     pub fn parse(text: &str) -> Result<Config> {
-        let raw: Raw = toml::from_str(text).map_err(|e| Error(format!("{FILE} tidak valid: {e}")))?;
+        let raw: Raw =
+            toml::from_str(text).map_err(|e| Error(format!("{FILE} tidak valid: {e}")))?;
         let mut harness = Vec::new();
         for (name, value) in raw.harness {
-            let cmd = value
-                .as_str()
-                .ok_or_else(|| Error(format!("{FILE}: [harness].{name} harus berupa string perintah")))?;
+            let cmd = value.as_str().ok_or_else(|| {
+                Error(format!(
+                    "{FILE}: [harness].{name} harus berupa string perintah"
+                ))
+            })?;
             harness.push((name, cmd.to_string()));
         }
         Ok(Config {

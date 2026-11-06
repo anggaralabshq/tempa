@@ -16,14 +16,21 @@ fn dir(d: &str) -> String {
 
 fn valid_slug(s: &str) -> bool {
     !s.is_empty()
-        && s.split('-').all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit()))
+        && s.split('-').all(|part| {
+            !part.is_empty()
+                && part
+                    .bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit())
+        })
 }
 
 fn check_slug(slug: &str) -> Result<()> {
     if valid_slug(slug) {
         Ok(())
     } else {
-        Err(Error(format!("slug \"{slug}\" tidak valid: pakai huruf kecil, angka, dan tanda hubung, contoh add-invoice")))
+        Err(Error(format!(
+            "slug \"{slug}\" tidak valid: pakai huruf kecil, angka, dan tanda hubung, contoh add-invoice"
+        )))
     }
 }
 
@@ -50,13 +57,18 @@ pub fn current_task_id(root: &Path) -> Result<String> {
     branch
         .strip_prefix("tempa/")
         .map(String::from)
-        .ok_or_else(|| Error(format!("{branch} bukan branch task; gunakan tempa task new")))
+        .ok_or_else(|| {
+            Error(format!(
+                "{branch} bukan branch task; gunakan tempa task new"
+            ))
+        })
 }
 
 pub fn task_approve(root: &Path) -> Result<()> {
     let cfg = Config::load(root)?;
     let path = plan_path(&cfg, &current_task_id(root)?);
-    let text = std::fs::read_to_string(root.join(&path)).map_err(|_| Error(format!("{path} tidak ditemukan")))?;
+    let text = std::fs::read_to_string(root.join(&path))
+        .map_err(|_| Error(format!("{path} tidak ditemukan")))?;
     let text = set_front(&text, "state", "approved");
     let text = set_front(&text, "approved_by", &gitx::user_name(root)?);
     let text = set_front(&text, "approved_at", &iso_today());
@@ -106,7 +118,10 @@ pub fn log(root: &Path, e: &LogEntry) -> Result<()> {
     one_line("--reason", &e.reason)?;
     one_line("--agent", &e.agent)?;
     if !["lulus", "gagal", "belum"].contains(&e.harness.as_str()) {
-        return Err(Error(format!("--harness harus lulus, gagal, atau belum (bukan \"{}\")", e.harness)));
+        return Err(Error(format!(
+            "--harness harus lulus, gagal, atau belum (bukan \"{}\")",
+            e.harness
+        )));
     }
     let decision = e.decision.clone().unwrap_or_else(|| "-".into());
     one_line("--decision", &decision)?;
@@ -143,7 +158,12 @@ pub fn pr_body(root: &Path) -> Result<String> {
         .unwrap_or_else(|| "-".into());
     let reviewer = split_front(&plan)
         .0
-        .and_then(|f| f.pairs.into_iter().find(|(k, v)| k == "reviewer" && !v.is_empty()).map(|(_, v)| v))
+        .and_then(|f| {
+            f.pairs
+                .into_iter()
+                .find(|(k, v)| k == "reviewer" && !v.is_empty())
+                .map(|(_, v)| v)
+        })
         .unwrap_or_else(|| "-".into());
 
     let dec_dir = dir(&cfg.docs.decisions);
@@ -155,18 +175,37 @@ pub fn pr_body(root: &Path) -> Result<String> {
         .collect();
 
     let changes = std::fs::read_to_string(root.join(&cfg.docs.changes)).unwrap_or_default();
-    let entries: Vec<ChangeEntry> = parse_changes(&changes).into_iter().filter(|e| e.task_id == id).collect();
+    let entries: Vec<ChangeEntry> = parse_changes(&changes)
+        .into_iter()
+        .filter(|e| e.task_id == id)
+        .collect();
     let agent = entries
         .last()
-        .and_then(|e| e.fields.iter().find(|(k, _)| k == "Agent").map(|(_, v)| v.clone()))
+        .and_then(|e| {
+            e.fields
+                .iter()
+                .find(|(k, _)| k == "Agent")
+                .map(|(_, v)| v.clone())
+        })
         .unwrap_or_else(|| "-".into());
-    let or_dash = |v: Vec<String>| if v.is_empty() { "-".to_string() } else { v.join("\n") };
+    let or_dash = |v: Vec<String>| {
+        if v.is_empty() {
+            "-".to_string()
+        } else {
+            v.join("\n")
+        }
+    };
 
     Ok(format!(
         "## Ringkasan\n\n{summary}\n\n## Link plan\n\n{path}\n\n## Decision terkait\n\n{}\n\n\
          ## Entri changes\n\n{}\n\n## Hasil harness\n\nLihat pipeline Bitbucket.\n\n\
          ## Review\n\n{reviewer}\n\n## Agent + model\n\n{agent}\n",
         or_dash(decisions.iter().map(|d| format!("- {d}")).collect()),
-        or_dash(entries.iter().map(|e| render_entry(e).trim_end().to_string()).collect()),
+        or_dash(
+            entries
+                .iter()
+                .map(|e| render_entry(e).trim_end().to_string())
+                .collect()
+        ),
     ))
 }

@@ -106,11 +106,18 @@ pub fn drift(root: &Path) -> Result<Vec<Drift>> {
         match disk_hash(root, &f.path) {
             None => out.push(Drift::Missing(f.path.clone())),
             Some(h) if h == want => {}
-            Some(h) if lock.files.get(&f.path) == Some(&h) => out.push(Drift::Stale(f.path.clone())),
+            Some(h) if lock.files.get(&f.path) == Some(&h) => {
+                out.push(Drift::Stale(f.path.clone()))
+            }
             Some(_) => out.push(Drift::Modified(f.path.clone())),
         }
     }
-    let dirs: BTreeSet<&str> = cfg.agents.enabled.iter().flat_map(|a| managed_dirs(*a).iter().copied()).collect();
+    let dirs: BTreeSet<&str> = cfg
+        .agents
+        .enabled
+        .iter()
+        .flat_map(|a| managed_dirs(*a).iter().copied())
+        .collect();
     for dir in dirs {
         for (rel, _) in source::walk(&root.join(dir))? {
             let path = format!("{dir}/{rel}");
@@ -118,7 +125,11 @@ pub fn drift(root: &Path) -> Result<Vec<Drift>> {
                 continue;
             }
             // An unchanged output whose source was removed: `tempa sync` deletes it.
-            if lock.files.get(&path).is_some_and(|h| disk_hash(root, &path).as_ref() == Some(h)) {
+            if lock
+                .files
+                .get(&path)
+                .is_some_and(|h| disk_hash(root, &path).as_ref() == Some(h))
+            {
                 out.push(Drift::Stale(path));
             } else {
                 out.push(Drift::Untracked(path));
@@ -141,12 +152,16 @@ pub fn drift_findings(d: &[Drift]) -> Vec<Finding> {
                 Some(p.clone()),
                 "file baru di folder milik tempa — jalankan tempa import untuk menyerap",
             ),
-            Drift::Missing(p) => {
-                Finding::error("drift.missing", Some(p.clone()), "file hasil generate hilang — jalankan tempa sync")
-            }
-            Drift::Stale(p) => {
-                Finding::error("drift.stale", Some(p.clone()), "sumber berubah, belum di-sync — jalankan tempa sync")
-            }
+            Drift::Missing(p) => Finding::error(
+                "drift.missing",
+                Some(p.clone()),
+                "file hasil generate hilang — jalankan tempa sync",
+            ),
+            Drift::Stale(p) => Finding::error(
+                "drift.stale",
+                Some(p.clone()),
+                "sumber berubah, belum di-sync — jalankan tempa sync",
+            ),
         })
         .collect()
 }

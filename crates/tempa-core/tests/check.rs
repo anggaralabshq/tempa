@@ -8,10 +8,14 @@ use tempa_core::{Finding, Severity};
 const AGENTS: &str = "## Stack\nx\n## Perintah\nx\n## Konvensi\nx\n## Area terlarang\nx\n";
 const HARNESS: &str = "## Definisi selesai\nx\n## Gate yang berlaku\nx\n";
 const PLAN: &str = "## Tujuan\nx\n## Langkah\nx\n## File yang disentuh\nx\n## Risiko\nx\n";
-const DECISION: &str = "## Konteks\na\n## Opsi\nb\n## Keputusan\nc\n## Konsekuensi\nd\n## Agent + model\ne\n";
+const DECISION: &str =
+    "## Konteks\na\n## Opsi\nb\n## Keputusan\nc\n## Konsekuensi\nd\n## Agent + model\ne\n";
 
 fn contract() -> CheckOpts {
-    CheckOpts { contract_only: true, base: None }
+    CheckOpts {
+        contract_only: true,
+        base: None,
+    }
 }
 
 fn codes(f: &[Finding]) -> Vec<&'static str> {
@@ -45,8 +49,14 @@ fn repo_on(branch: &str) -> tempfile::TempDir {
 }
 
 fn add_plan_and_change(p: &Path, id: &str) {
-    write(p, &format!("docs/plans/{id}.md"), &format!("---\ntask_id: {id}\nstate: plan\n---\n{PLAN}"));
-    let entry = format!("\n## 2026-11-06 · {id}\n- Ringkasan: s\n- Alasan: r\n- Decision: -\n- Harness: belum\n- Agent: codex / gpt-5\n");
+    write(
+        p,
+        &format!("docs/plans/{id}.md"),
+        &format!("---\ntask_id: {id}\nstate: plan\n---\n{PLAN}"),
+    );
+    let entry = format!(
+        "\n## 2026-11-06 · {id}\n- Ringkasan: s\n- Alasan: r\n- Decision: -\n- Harness: belum\n- Agent: codex / gpt-5\n"
+    );
     std::fs::write(p.join("CHANGES.md"), read(p, "CHANGES.md") + &entry).unwrap();
 }
 
@@ -67,10 +77,16 @@ fn missing_base_is_warning_locally() {
     git(p, &["config", "user.email", "t@x"]);
     write(p, "tempa.toml", &default_toml("x"));
     let f = check(p, &contract()).unwrap();
-    let b = f.iter().find(|x| x.code == "git.base_unavailable").expect("base finding");
+    let b = f
+        .iter()
+        .find(|x| x.code == "git.base_unavailable")
+        .expect("base finding");
     assert_eq!(b.severity, Severity::Warning);
     assert!(b.message.contains("depth: full"));
-    assert!(codes(&f).contains(&"contract.missing_doc"), "docs still checked without a range: {f:?}");
+    assert!(
+        codes(&f).contains(&"contract.missing_doc"),
+        "docs still checked without a range: {f:?}"
+    );
 }
 
 #[test]
@@ -79,7 +95,10 @@ fn tempa_branch_requires_plan_and_change() {
     write(d.path(), "src/a.rs", "fn a() {}\n");
     commit(d.path(), "code");
     let c = codes(&check(d.path(), &contract()).unwrap());
-    assert!(c.contains(&"task.no_plan") && c.contains(&"task.no_change_entry"), "{c:?}");
+    assert!(
+        c.contains(&"task.no_plan") && c.contains(&"task.no_change_entry"),
+        "{c:?}"
+    );
 }
 
 #[test]
@@ -111,7 +130,10 @@ fn new_dependency_needs_decision() {
     add_plan_and_change(d.path(), "20261106-dep");
     commit(d.path(), "dep");
     let f = check(d.path(), &contract()).unwrap();
-    let dec = f.iter().find(|x| x.code == "task.decision_required").expect("decision finding");
+    let dec = f
+        .iter()
+        .find(|x| x.code == "task.decision_required")
+        .expect("decision finding");
     assert!(dec.message.contains("new-dependency"));
     write(d.path(), "docs/decisions/2026-11-06-dep.md", DECISION);
     commit(d.path(), "decision");
@@ -125,7 +147,10 @@ fn schema_path_needs_decision() {
     add_plan_and_change(d.path(), "20261106-mig");
     commit(d.path(), "mig");
     let f = check(d.path(), &contract()).unwrap();
-    assert!(f.iter().any(|x| x.code == "task.decision_required" && x.message.contains("schema-change")));
+    assert!(
+        f.iter()
+            .any(|x| x.code == "task.decision_required" && x.message.contains("schema-change"))
+    );
 }
 
 #[test]
@@ -143,15 +168,23 @@ fn skip_author_skips_contract() {
     std::fs::write(d.path().join("AGENTS.md"), "rusak\n").unwrap();
     write(d.path(), "package.json", "{}\n");
     git(d.path(), &["add", "-A"]);
-    git(d.path(), &["-c", "user.name=renovate[bot]", "commit", "-qm", "bump"]);
+    git(
+        d.path(),
+        &["-c", "user.name=renovate[bot]", "commit", "-qm", "bump"],
+    );
     let c = codes(&check(d.path(), &contract()).unwrap());
-    assert!(!c.iter().any(|x| x.starts_with("task.") || x.starts_with("contract.")), "{c:?}");
+    assert!(
+        !c.iter()
+            .any(|x| x.starts_with("task.") || x.starts_with("contract.")),
+        "{c:?}"
+    );
 }
 
 #[test]
 fn diff_too_large() {
     let d = repo_on("tempa/20261106-big");
-    let toml = read(d.path(), "tempa.toml").replace("max_diff_lines        = 800", "max_diff_lines        = 5");
+    let toml = read(d.path(), "tempa.toml")
+        .replace("max_diff_lines        = 800", "max_diff_lines        = 5");
     std::fs::write(d.path().join("tempa.toml"), toml).unwrap();
     git(d.path(), &["commit", "-qam", "limit"]);
     git(d.path(), &["switch", "-q", "main"]);
@@ -175,7 +208,11 @@ fn drift_fails_check() {
 #[test]
 fn harness_stops_at_first_failure() {
     let d = tempfile::tempdir().unwrap();
-    write(d.path(), "tempa.toml", "[project]\nname = \"x\"\n\n[harness]\na = \"exit 0\"\nb = \"exit 3\"\nc = \"touch ran_c\"\n");
+    write(
+        d.path(),
+        "tempa.toml",
+        "[project]\nname = \"x\"\n\n[harness]\na = \"exit 0\"\nb = \"exit 3\"\nc = \"touch ran_c\"\n",
+    );
     let cfg = Config::load(d.path()).unwrap();
     let f = run_harness(d.path(), &cfg).unwrap();
     assert_eq!(f.len(), 1);
@@ -188,12 +225,22 @@ fn harness_stops_at_first_failure() {
 fn full_check_runs_harness_contract_only_does_not() {
     let d = repo_on("main-copy");
     git(d.path(), &["switch", "-q", "main"]);
-    let toml = read(d.path(), "tempa.toml").replace("# format    = \"bun run format:check\"", "t = \"touch ran_t\"");
+    let toml = read(d.path(), "tempa.toml").replace(
+        "# format    = \"bun run format:check\"",
+        "t = \"touch ran_t\"",
+    );
     std::fs::write(d.path().join("tempa.toml"), toml).unwrap();
     tempa_core::sync::sync(d.path()).unwrap();
     check(d.path(), &contract()).unwrap();
     assert!(!d.path().join("ran_t").exists());
-    check(d.path(), &CheckOpts { contract_only: false, base: None }).unwrap();
+    check(
+        d.path(),
+        &CheckOpts {
+            contract_only: false,
+            base: None,
+        },
+    )
+    .unwrap();
     assert!(d.path().join("ran_t").exists());
 }
 

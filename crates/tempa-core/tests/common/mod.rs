@@ -20,8 +20,17 @@ fn copy_dir(from: &Path, to: &Path) {
 }
 
 pub fn git(dir: &Path, args: &[&str]) -> String {
-    let out = Command::new("git").arg("-C").arg(dir).args(args).output().unwrap();
-    assert!(out.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&out.stderr));
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(dir)
+        .args(args)
+        .output()
+        .unwrap();
+    assert!(
+        out.status.success(),
+        "git {args:?}: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
     String::from_utf8(out.stdout).unwrap()
 }
 
@@ -50,7 +59,8 @@ pub fn read(dir: &Path, rel: &str) -> String {
     std::fs::read_to_string(dir.join(rel)).unwrap_or_else(|e| panic!("read {rel}: {e}"))
 }
 
-pub const VALID_AGENTS: &str = "## Stack\nx\n## Perintah\nx\n## Konvensi\nx\n## Area terlarang\nx\n";
+pub const VALID_AGENTS: &str =
+    "## Stack\nx\n## Perintah\nx\n## Konvensi\nx\n## Area terlarang\nx\n";
 pub const VALID_HARNESS: &str = "## Definisi selesai\nx\n## Gate yang berlaku\nx\n";
 
 /// Contract-valid repo committed on `main` (synced, no drift).

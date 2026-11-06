@@ -18,7 +18,10 @@ pub fn civil_from_days(days: i64) -> (i32, u32, u32) {
 }
 
 pub fn today_utc() -> (i32, u32, u32) {
-    let secs = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
     civil_from_days((secs / 86_400) as i64)
 }
 

@@ -14,11 +14,13 @@ pub fn require_headings(md: &str, required: &[String]) -> Vec<(String, &'static 
     let secs = sections(md);
     required
         .iter()
-        .filter_map(|h| match secs.iter().find(|s| s.title.eq_ignore_ascii_case(h)) {
-            None => Some((h.clone(), "missing")),
-            Some(s) if s.body.trim().is_empty() => Some((h.clone(), "empty")),
-            Some(_) => None,
-        })
+        .filter_map(
+            |h| match secs.iter().find(|s| s.title.eq_ignore_ascii_case(h)) {
+                None => Some((h.clone(), "missing")),
+                Some(s) if s.body.trim().is_empty() => Some((h.clone(), "empty")),
+                Some(_) => None,
+            },
+        )
         .collect()
 }
 
@@ -35,7 +37,11 @@ pub fn parse_changes(md: &str) -> Vec<ChangeEntry> {
     for line in crate::md::normalize_eol(md).lines() {
         if let Some(head) = line.strip_prefix("## ") {
             if let Some((date, id)) = head.split_once('·') {
-                out.push(ChangeEntry { date: date.trim().into(), task_id: id.trim().into(), fields: vec![] });
+                out.push(ChangeEntry {
+                    date: date.trim().into(),
+                    task_id: id.trim().into(),
+                    fields: vec![],
+                });
                 continue;
             }
         }
@@ -51,9 +57,17 @@ pub fn parse_changes(md: &str) -> Vec<ChangeEntry> {
 fn headings(findings: &mut Vec<Finding>, path: &str, md: &str, required: &[String]) {
     for (h, kind) in require_headings(md, required) {
         findings.push(if kind == "missing" {
-            Finding::error("contract.missing_heading", Some(path.into()), format!("heading wajib \"{h}\" tidak ada"))
+            Finding::error(
+                "contract.missing_heading",
+                Some(path.into()),
+                format!("heading wajib \"{h}\" tidak ada"),
+            )
         } else {
-            Finding::error("contract.empty_heading", Some(path.into()), format!("heading \"{h}\" masih kosong"))
+            Finding::error(
+                "contract.empty_heading",
+                Some(path.into()),
+                format!("heading \"{h}\" masih kosong"),
+            )
         });
     }
 }
@@ -62,7 +76,11 @@ fn doc(root: &Path, findings: &mut Vec<Finding>, path: &str) -> Option<String> {
     match std::fs::read_to_string(root.join(path)) {
         Ok(t) => Some(t),
         Err(_) => {
-            findings.push(Finding::error("contract.missing_doc", Some(path.into()), "dokumen kontrak belum ada; jalankan tempa init"));
+            findings.push(Finding::error(
+                "contract.missing_doc",
+                Some(path.into()),
+                "dokumen kontrak belum ada; jalankan tempa init",
+            ));
             None
         }
     }
@@ -90,9 +108,17 @@ pub fn check_docs(root: &Path, cfg: &Config) -> Result<Vec<Finding>> {
 
     for (path, text) in md_files(root, &docs.plan)? {
         let (front, _) = split_front(&text);
-        let has = |k: &str| front.as_ref().is_some_and(|fr| fr.pairs.iter().any(|(key, v)| key == k && !v.is_empty()));
+        let has = |k: &str| {
+            front
+                .as_ref()
+                .is_some_and(|fr| fr.pairs.iter().any(|(key, v)| key == k && !v.is_empty()))
+        };
         if !has("task_id") || !has("state") {
-            f.push(Finding::error("contract.plan_frontmatter", Some(path.clone()), "frontmatter plan wajib berisi task_id dan state"));
+            f.push(Finding::error(
+                "contract.plan_frontmatter",
+                Some(path.clone()),
+                "frontmatter plan wajib berisi task_id dan state",
+            ));
         }
         headings(&mut f, &path, &text, &h.plan);
     }

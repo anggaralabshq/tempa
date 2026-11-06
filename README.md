@@ -68,8 +68,25 @@ tempa pr-body                  # paste into the pull request
 | `tempa decide <slug>` | Create a decision record. |
 | `tempa log ...` | Append a changes entry for the current task. |
 | `tempa pr-body` | Print the pull request body for the current task. |
+| `tempa mcp` | Run the MCP server on stdio (agents start it from their MCP config). |
 
 Exit codes: `0` ok, `1` findings, `2` error.
+
+## MCP tools
+
+`tempa sync` registers a `tempa` MCP server (`tempa mcp`, stdio) in every agent's MCP config, so each agent can read the contract and write workflow documents that are validated as they are written. Turn it off with `[mcp] serve = false` in `tempa.toml`. `tempa` must be on the `PATH` of the agent process.
+
+Upgrading a repo that already has its own `.mcp.json`, `.cursor/mcp.json`, `opencode.json` or `.codex/config.toml` (files tempa did not write): `tempa sync` reports them as `drift.foreign` and the pre-commit hook blocks until you run `tempa import --yes`, which moves their servers into `.tempa/mcp.toml` and keeps their other keys.
+
+| Tool | What it does |
+|---|---|
+| `tempa_context` | AGENTS.md, commands, subagents, skills, rules (protected paths, harness, required headings) and the active plan. Agents that cannot load a command or subagent natively read it here. |
+| `tempa_status` | Current task, plan state, changes entries, drift (JSON). |
+| `tempa_plan` | Fill sections of the current plan. Unknown headings are rejected; approval stays with a person. |
+| `tempa_decide` | Create a decision record; every required heading must be filled. |
+| `tempa_log_change` | Append a changes entry (same rules as `tempa log`). |
+| `tempa_check` | Run `tempa check` (drift, contract, task rules); `harness: true` also runs the `[harness]` commands. Findings as JSON. |
+| `tempa_pr_body` | Pull request body for the current task. |
 
 ## Rules worth knowing
 

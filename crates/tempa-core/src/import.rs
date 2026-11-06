@@ -350,6 +350,18 @@ fn config_bases(root: &Path, plan: &mut Plan) -> Result<()> {
             if let (Some(k), Some(m)) = (mcp_key(from), v.as_object_mut()) {
                 m.remove(k);
             }
+            // `tempa sync` adds this entry while it serves `tempa mcp`; it is not the user's.
+            if from == ".claude/settings.json"
+                && let Some(m) = v.as_object_mut()
+                && let Some(list) = m
+                    .get_mut("enabledMcpjsonServers")
+                    .and_then(Value::as_array_mut)
+            {
+                list.retain(|x| x != crate::targets::TEMPA_SERVER);
+                if list.is_empty() {
+                    m.remove("enabledMcpjsonServers");
+                }
+            }
             serde_json::to_string_pretty(&v)? + "\n"
         };
         plan.put(
@@ -580,6 +592,10 @@ fn mcp(root: &Path, plan: &mut Plan) -> Result<()> {
                 .collect()
         };
         for (name, s) in found {
+            // The server `tempa sync` injects is not the user's; never absorb it.
+            if name == crate::targets::TEMPA_SERVER && s.command.as_deref() == Some("tempa") {
+                continue;
+            }
             if let std::collections::btree_map::Entry::Vacant(e) = file.servers.entry(name) {
                 e.insert(s);
                 added = true;

@@ -362,7 +362,32 @@ fn codex_config(out: &mut Out, src: &Source) {
     out.file(path, format!("{}\n{}", header_toml(), doc));
 }
 
+/// Name of the server `tempa sync` adds for `tempa mcp`.
+pub const TEMPA_SERVER: &str = "tempa";
+
+/// True when render adds the `tempa` server (a user server of that name wins).
+pub fn injects_tempa(cfg: &Config, src: &Source) -> bool {
+    cfg.mcp.serve && !src.mcp.contains_key(TEMPA_SERVER)
+}
+
 pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
+    let inject = injects_tempa(cfg, src);
+    let with_tempa;
+    let src = if inject {
+        let mut s = src.clone();
+        s.mcp.insert(
+            TEMPA_SERVER.into(),
+            McpServer {
+                command: Some("tempa".into()),
+                args: vec!["mcp".into()],
+                ..McpServer::default()
+            },
+        );
+        with_tempa = s;
+        &with_tempa
+    } else {
+        src
+    };
     let mut out = Out {
         agent,
         r: Rendered::default(),
@@ -409,6 +434,19 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 }
             }
             perms.insert("deny".into(), Value::Array(deny));
+            if inject {
+                // Claude Code asks before starting a project `.mcp.json` server unless listed here.
+                let list = v
+                    .entry("enabledMcpjsonServers")
+                    .or_insert_with(|| json!([]));
+                if !list.is_array() {
+                    *list = json!([]);
+                }
+                let list = list.as_array_mut().expect("array");
+                if !list.iter().any(|x| x == TEMPA_SERVER) {
+                    list.push(json!(TEMPA_SERVER));
+                }
+            }
             o.file(path, pretty(&v));
 
             mcp_file(
@@ -496,6 +534,9 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
             let path = "opencode.json";
             if !src.mcp.is_empty() || src.bases.contains_key(path) {
                 let mut v = base_json(src, path);
+                // OpenCode adds this key itself when it runs; render it so that is not drift.
+                v.entry("$schema")
+                    .or_insert_with(|| json!("https://opencode.ai/config.json"));
                 if !src.mcp.is_empty() {
                     let servers = src
                         .mcp

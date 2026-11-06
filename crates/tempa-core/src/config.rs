@@ -153,6 +153,19 @@ impl Default for Ci {
     }
 }
 
+/// `[mcp]`: the `tempa mcp` server tempa adds to every agent's MCP config.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(default)]
+pub struct Mcp {
+    pub serve: bool,
+}
+
+impl Default for Mcp {
+    fn default() -> Self {
+        Mcp { serve: true }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub project: Project,
@@ -163,6 +176,7 @@ pub struct Config {
     pub harness: Vec<(String, String)>,
     pub gates: Gates,
     pub ci: Ci,
+    pub mcp: Mcp,
 }
 
 #[derive(Deserialize)]
@@ -180,6 +194,8 @@ struct Raw {
     gates: Gates,
     #[serde(default)]
     ci: Ci,
+    #[serde(default)]
+    mcp: Mcp,
 }
 
 impl Config {
@@ -210,6 +226,7 @@ impl Config {
             harness,
             gates: raw.gates,
             ci: raw.ci,
+            mcp: raw.mcp,
         })
     }
 }
@@ -252,6 +269,9 @@ protected_paths       = [".env*", "tempa.toml"]   # add your CI files, e.g. "bit
 base            = "main"
 skip_authors    = ["renovate[bot]"]
 docs_only_paths = ["docs/**", "*.md"]
+
+[mcp]
+serve = true      # add the `tempa mcp` server to every agent's MCP config
 "#,
         version = env!("CARGO_PKG_VERSION")
     )

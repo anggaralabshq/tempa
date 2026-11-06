@@ -1,1 +1,3 @@
+# LF everywhere, also on Windows checkouts with core.autocrlf (templates are include_str!-ed).
+* text=auto eol=lf
 CHANGES.md merge=union

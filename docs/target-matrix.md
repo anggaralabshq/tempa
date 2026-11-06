@@ -19,6 +19,7 @@ Dipakai oleh `tempa sync` (`crates/tempa-core/src/targets.rs`). Perbarui file in
 - Cursor commands: halaman docs commands mengarah ke Skills; Cursor menyediakan migrasi command → skill (`disable-model-invocation: true`). `.cursor/commands/` dipertahankan di M1; pindahkan ke skill bila Cursor berhenti membacanya.
 - MCP env/header: sumber memakai sintaks Claude `${VAR}`. OpenCode → `{env:VAR}`. Codex meneruskan `env` dan `http_headers` apa adanya: `KEY = "${KEY}"` → `env_vars = ["KEY"]`, header `"${VAR}"` → `env_http_headers`, `Authorization: "Bearer ${VAR}"` → `bearer_token_env_var`; bentuk lain (mis. `DB = "${DB_URL}"`, ganti nama) dilaporkan sebagai gap `mcp`. Cursor/Gemini: `${VAR}` diteruskan apa adanya (belum terverifikasi docs untuk Cursor).
 - Cursor membaca `AGENTS.md` menurut sumber pihak ketiga, tapi belum terkonfirmasi docs resmi; `.cursor/rules/tempa.mdc` tetap di-generate.
+- Server `tempa` (M3-lite): `tempa sync` menambahkan `tempa` (`command = "tempa"`, `args = ["mcp"]`) ke kelima config MCP di atas saat render, kecuali `[mcp] serve = false` atau `.tempa/mcp.toml` sudah punya server bernama `tempa`. Tidak ditulis ke `.tempa/mcp.toml`, dan `tempa import` tidak menyerapnya. Claude: `.claude/settings.json` mendapat `enabledMcpjsonServers: ["tempa"]` supaya server proyek tidak perlu disetujui manual. Codex hanya memuat `.codex/config.toml` di proyek trusted. Command/subagent yang tidak didukung agent (gap di `tempa doctor`) bisa diambil lewat `tempa_context`.
 
 ## Sumber
 

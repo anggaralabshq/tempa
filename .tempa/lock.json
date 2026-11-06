@@ -1,12 +1,16 @@
 {
   "files": {
     ".claude/commands/review.md": "73f118f969275c2c785577730f7487eb5248eaace1c72367ef60001f9e2b1e23",
-    ".claude/settings.json": "88718861baf484635df585de90fbd634b706cafe10cca49de45c8ca44aad1276",
+    ".claude/settings.json": "b8c54434a09aad9187e46d58b3bc300dcab29ac475988cc5e63599b48e014e4f",
+    ".codex/config.toml": "50af9f140eec9305b3a73435309e4084b76a034dd4ce8416bdaf59076ec09c93",
     ".cursor/commands/review.md": "294adcb1c8b83825bf49f10277f78d9c5e43447800987641f1091bace44eb218",
+    ".cursor/mcp.json": "4809693514b746fa5b077c46b90a05e2ec07030f9fa6539fcc403c27cb963d3d",
     ".cursor/rules/tempa.mdc": "5b38bb546d6eddbd446c3354572848b4a28a6ab26c7898997aa48c4629b79362",
     ".gemini/commands/review.toml": "2a2eee4acbe4535520168a2135c190fc36a3a836cbfe4a714dc7dba71f2e08f0",
-    ".gemini/settings.json": "7b8b6ffcbc620569ad9c0df7dc278d3e41c5dafb9065a8578827241defd4e886",
+    ".gemini/settings.json": "4e3ac96597057b21cfc27460b7fd9f5e4b390c5deb0ea3f56d6bc360c3fba711",
+    ".mcp.json": "4809693514b746fa5b077c46b90a05e2ec07030f9fa6539fcc403c27cb963d3d",
     ".opencode/commands/review.md": "73f118f969275c2c785577730f7487eb5248eaace1c72367ef60001f9e2b1e23",
-    "CLAUDE.md": "246825d497f0fde93d9e9398f1668d6ff8afba6e6bb3c5b8c755eb7f0adee68e"
+    "CLAUDE.md": "246825d497f0fde93d9e9398f1668d6ff8afba6e6bb3c5b8c755eb7f0adee68e",
+    "opencode.json": "5ba0628d223e78740db5955ce64583d4ee36d8d319f2ef59a69a39db6bde9d7f"
   }
 }

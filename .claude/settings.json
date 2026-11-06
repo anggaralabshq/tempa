@@ -1,4 +1,7 @@
 {
+  "enabledMcpjsonServers": [
+    "tempa"
+  ],
   "permissions": {
     "deny": [
       "Edit(/.env*)",

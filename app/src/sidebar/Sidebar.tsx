@@ -2,13 +2,15 @@ import type { Project } from "../lib/ipc";
 
 type Props = {
   projects: Project[];
+  /** Drift plus contract errors, by project path. */
+  problems: Record<string, number>;
   active: string | null;
   onSelect: (id: string) => void;
   onAdd: () => void;
   onRemove: (id: string) => void;
 };
 
-export default function Sidebar({ projects, active, onSelect, onAdd, onRemove }: Props) {
+export default function Sidebar({ projects, problems, active, onSelect, onAdd, onRemove }: Props) {
   return (
     <div className="flex h-full flex-col">
       <h2 className="mb-2 text-xs uppercase tracking-wide text-white/50">Projects</h2>
@@ -18,6 +20,14 @@ export default function Sidebar({ projects, active, onSelect, onAdd, onRemove }:
             <button type="button" title={p.path} onClick={() => onSelect(p.id)} className="flex-1 truncate px-2 py-1 text-left">
               {p.name}
             </button>
+            {(problems[p.path] ?? 0) > 0 && (
+              <span
+                aria-label={`${problems[p.path]} contract problem${problems[p.path] === 1 ? "" : "s"}`}
+                className="px-1 text-xs text-amber-400"
+              >
+                {problems[p.path]}⚠
+              </span>
+            )}
             <button
               type="button"
               aria-label={`Remove ${p.name}`}

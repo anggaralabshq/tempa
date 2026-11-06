@@ -104,3 +104,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-release-version-check
+- Summary: Release stops early when the tag does not match the crate version
+- Reason: m4 review: a mismatched tag would ship binaries reporting the wrong version and fail crates.io
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

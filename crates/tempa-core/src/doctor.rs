@@ -47,6 +47,7 @@ pub fn doctor(root: &Path) -> Result<DoctorReport> {
                 protected: match agent {
                     Agent::Claude => "settings deny",
                     Agent::Cursor => "cli deny (IDE: CI)",
+                    Agent::Opencode => "permission deny",
                     _ => "gap (CI)",
                 },
                 lifecycle: if cfg.mcp.serve || src.mcp.contains_key(TEMPA_SERVER) {

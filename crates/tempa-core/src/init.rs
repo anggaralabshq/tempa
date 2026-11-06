@@ -39,14 +39,26 @@ pub fn init(root: &Path) -> Result<Vec<String>> {
     create(config::FILE, &config::default_toml(&project_name(root)))?;
     let cfg = Config::load(root)?;
     let d = &cfg.docs;
-    create(&d.context, &heading_doc(Some(&cfg.project.name), &cfg.headings.context))?;
-    create(&d.harness, &heading_doc(Some("Harness"), &cfg.headings.harness))?;
+    create(
+        &d.context,
+        &heading_doc(Some(&cfg.project.name), &cfg.headings.context),
+    )?;
+    create(
+        &d.harness,
+        &heading_doc(Some("Harness"), &cfg.headings.harness),
+    )?;
     create(&d.changes, "# Changes\n")?;
     create(&format!("{}/.gitkeep", d.plan.trim_end_matches('/')), "")?;
-    create(&format!("{}/.gitkeep", d.decisions.trim_end_matches('/')), "")?;
+    create(
+        &format!("{}/.gitkeep", d.decisions.trim_end_matches('/')),
+        "",
+    )?;
     create(&format!("{HOOKS_DIR}/pre-commit"), PRE_COMMIT)?;
     create(&format!("{HOOKS_DIR}/pre-push"), PRE_PUSH)?;
-    create("docs/tempa-devops.md", &DEVOPS.replace("{version}", env!("CARGO_PKG_VERSION")))?;
+    create(
+        "docs/tempa-devops.md",
+        &DEVOPS.replace("{version}", env!("CARGO_PKG_VERSION")),
+    )?;
 
     let attr_line = format!("{} merge=union", d.changes);
     let attrs = root.join(".gitattributes");
@@ -67,10 +79,14 @@ pub fn init(root: &Path) -> Result<Vec<String>> {
     #[cfg(unix)]
     for hook in ["pre-commit", "pre-push"] {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(root.join(HOOKS_DIR).join(hook), std::fs::Permissions::from_mode(0o755))?;
+        std::fs::set_permissions(
+            root.join(HOOKS_DIR).join(hook),
+            std::fs::Permissions::from_mode(0o755),
+        )?;
     }
 
-    if gitx::is_repo(root) && gitx::get_config(root, "core.hooksPath").as_deref() != Some(HOOKS_DIR) {
+    if gitx::is_repo(root) && gitx::get_config(root, "core.hooksPath").as_deref() != Some(HOOKS_DIR)
+    {
         gitx::set_config(root, "core.hooksPath", HOOKS_DIR)?;
     }
     Ok(created)

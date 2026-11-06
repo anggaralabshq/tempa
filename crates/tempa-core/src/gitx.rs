@@ -15,7 +15,11 @@ fn git(root: &Path, args: &[&str]) -> Result<String> {
         .output()
         .map_err(|e| Error(format!("git tidak bisa dijalankan: {e}")))?;
     if !out.status.success() {
-        return Err(Error(format!("git {}: {}", args.join(" "), String::from_utf8_lossy(&out.stderr).trim())));
+        return Err(Error(format!(
+            "git {}: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&out.stderr).trim()
+        )));
     }
     Ok(String::from_utf8_lossy(&out.stdout).to_string())
 }
@@ -40,7 +44,11 @@ pub fn current_branch(root: &Path) -> Result<String> {
 pub fn base_name(cfg: &Config, explicit: Option<&str>) -> String {
     explicit
         .map(String::from)
-        .or_else(|| std::env::var("BITBUCKET_PR_DESTINATION_BRANCH").ok().filter(|s| !s.is_empty()))
+        .or_else(|| {
+            std::env::var("BITBUCKET_PR_DESTINATION_BRANCH")
+                .ok()
+                .filter(|s| !s.is_empty())
+        })
         .unwrap_or_else(|| cfg.ci.base.clone())
 }
 
@@ -48,21 +56,41 @@ pub fn base_name(cfg: &Config, explicit: Option<&str>) -> String {
 pub fn resolve_base(root: &Path, cfg: &Config, explicit: Option<&str>) -> Option<String> {
     let name = base_name(cfg, explicit);
     [format!("origin/{name}"), name].iter().find_map(|r| {
-        git(root, &["rev-parse", "--verify", "--quiet", &format!("{r}^{{commit}}")]).ok()?;
-        git(root, &["merge-base", r, "HEAD"]).ok().map(|s| s.trim().to_string())
+        git(
+            root,
+            &[
+                "rev-parse",
+                "--verify",
+                "--quiet",
+                &format!("{r}^{{commit}}"),
+            ],
+        )
+        .ok()?;
+        git(root, &["merge-base", r, "HEAD"])
+            .ok()
+            .map(|s| s.trim().to_string())
     })
 }
 
 fn names(out: &str) -> Vec<String> {
-    out.split('\0').filter(|s| !s.is_empty()).map(String::from).collect()
+    out.split('\0')
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+        .collect()
 }
 
 pub fn changed_files(root: &Path, base: &str) -> Result<Vec<String>> {
-    Ok(names(&git(root, &["diff", "--name-only", "-z", base, "HEAD"])?))
+    Ok(names(&git(
+        root,
+        &["diff", "--name-only", "-z", base, "HEAD"],
+    )?))
 }
 
 pub fn added_files(root: &Path, base: &str) -> Result<Vec<String>> {
-    Ok(names(&git(root, &["diff", "--name-only", "-z", "--diff-filter=A", base, "HEAD"])?))
+    Ok(names(&git(
+        root,
+        &["diff", "--name-only", "-z", "--diff-filter=A", base, "HEAD"],
+    )?))
 }
 
 /// Added + deleted lines between `base` and HEAD; binary files count 0.
@@ -81,7 +109,12 @@ pub fn diff_lines(root: &Path, base: &str, exclude: &BTreeSet<String>) -> Result
 }
 
 pub fn authors(root: &Path, base: &str) -> Result<BTreeSet<String>> {
-    Ok(git(root, &["log", "--format=%an", &format!("{base}..HEAD")])?.lines().map(String::from).collect())
+    Ok(
+        git(root, &["log", "--format=%an", &format!("{base}..HEAD")])?
+            .lines()
+            .map(String::from)
+            .collect(),
+    )
 }
 
 pub fn user_name(root: &Path) -> Result<String> {
@@ -94,7 +127,9 @@ pub fn set_config(root: &Path, key: &str, value: &str) -> Result<()> {
 }
 
 pub fn get_config(root: &Path, key: &str) -> Option<String> {
-    git(root, &["config", "--get", key]).ok().map(|s| s.trim().to_string())
+    git(root, &["config", "--get", key])
+        .ok()
+        .map(|s| s.trim().to_string())
 }
 
 pub fn switch_new(root: &Path, branch: &str) -> Result<()> {

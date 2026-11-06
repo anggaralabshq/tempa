@@ -9,7 +9,11 @@ fn loads_canonical_tree_sorted() {
     write(p, "tempa.toml", &default_toml("x"));
     write(p, "AGENTS.md", "# A\n");
     write(p, ".tempa/commands/z.md", "---\ndescription: Z\n---\nz\n");
-    write(p, ".tempa/commands/db/migrate.md", "---\ndescription: M\n---\nm\n");
+    write(
+        p,
+        ".tempa/commands/db/migrate.md",
+        "---\ndescription: M\n---\nm\n",
+    );
     write(p, ".tempa/skills/adr/SKILL.md", "---\nname: adr\n---\nx\n");
     write(p, ".tempa/skills/adr/template.md", "# ADR\n");
     write(p, ".tempa/mcp.toml", "[servers.pg]\ncommand=\"npx\"\n");
@@ -18,8 +22,17 @@ fn loads_canonical_tree_sorted() {
     let cfg = Config::load(p).unwrap();
     let src = tempa_core::source::load(p, &cfg).unwrap();
     assert_eq!(src.agents_md, "# A\n");
-    assert_eq!(src.commands.iter().map(|c| c.rel.as_str()).collect::<Vec<_>>(), ["db/migrate.md", "z.md"]);
-    assert_eq!(tempa_core::source::front_get(&src.commands[1], "description"), Some("Z"));
+    assert_eq!(
+        src.commands
+            .iter()
+            .map(|c| c.rel.as_str())
+            .collect::<Vec<_>>(),
+        ["db/migrate.md", "z.md"]
+    );
+    assert_eq!(
+        tempa_core::source::front_get(&src.commands[1], "description"),
+        Some("Z")
+    );
     assert_eq!(src.commands[1].body, "z\n");
     assert_eq!(src.skills.len(), 1);
     assert_eq!(src.skills[0].name, "adr");

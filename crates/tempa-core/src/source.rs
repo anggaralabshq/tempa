@@ -59,11 +59,20 @@ pub struct McpFile {
 
 pub fn parse_item(rel: String, text: &str) -> Item {
     let (front, body) = split_front(text);
-    Item { rel, front, body: crate::md::normalize_eol(body) }
+    Item {
+        rel,
+        front,
+        body: crate::md::normalize_eol(body),
+    }
 }
 
 pub fn front_get<'a>(item: &'a Item, key: &str) -> Option<&'a str> {
-    item.front.as_ref()?.pairs.iter().find(|(k, _)| k == key).map(|(_, v)| v.as_str())
+    item.front
+        .as_ref()?
+        .pairs
+        .iter()
+        .find(|(k, _)| k == key)
+        .map(|(_, v)| v.as_str())
 }
 
 /// All files under `dir`, as (`/`-separated relative path, full path), sorted.
@@ -76,7 +85,11 @@ pub fn walk(dir: &Path) -> Result<Vec<(String, std::path::PathBuf)>> {
                 go(base, &path, out)?;
             } else {
                 let rel = path.strip_prefix(base).expect("under base");
-                let rel = rel.components().map(|c| c.as_os_str().to_string_lossy()).collect::<Vec<_>>().join("/");
+                let rel = rel
+                    .components()
+                    .map(|c| c.as_os_str().to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join("/");
                 out.push((rel, path));
             }
         }
@@ -104,18 +117,25 @@ pub fn load(root: &Path, cfg: &Config) -> Result<Source> {
 
     let mut skills: BTreeMap<String, Skill> = BTreeMap::new();
     for (rel, path) in walk(&t.join("skills"))? {
-        let Some((name, file)) = rel.split_once('/') else { continue };
+        let Some((name, file)) = rel.split_once('/') else {
+            continue;
+        };
         skills
             .entry(name.to_string())
-            .or_insert_with(|| Skill { name: name.to_string(), files: Vec::new() })
+            .or_insert_with(|| Skill {
+                name: name.to_string(),
+                files: Vec::new(),
+            })
             .files
             .push((file.to_string(), std::fs::read(path)?));
     }
 
     let mcp = match std::fs::read_to_string(t.join("mcp.toml")) {
-        Ok(text) => toml::from_str::<McpFile>(&text)
-            .map_err(|e| Error(format!(".tempa/mcp.toml tidak valid: {e}")))?
-            .servers,
+        Ok(text) => {
+            toml::from_str::<McpFile>(&text)
+                .map_err(|e| Error(format!(".tempa/mcp.toml tidak valid: {e}")))?
+                .servers
+        }
         Err(_) => BTreeMap::new(),
     };
 

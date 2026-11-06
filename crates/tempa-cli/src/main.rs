@@ -4,7 +4,11 @@ use std::process::{Command, ExitCode};
 use tempa_core::{Finding, Severity, check, doctor, import, init, sync, task};
 
 #[derive(Parser)]
-#[command(name = "tempa", version, about = "Satu kontrak konteks untuk semua coding agent")]
+#[command(
+    name = "tempa",
+    version,
+    about = "Satu kontrak konteks untuk semua coding agent"
+)]
 struct Cli {
     #[command(subcommand)]
     cmd: Option<Cmd>,
@@ -76,12 +80,27 @@ enum TaskCmd {
 }
 
 fn print_doctor(r: &doctor::DoctorReport) {
-    println!("{:<10} {:>5} {:>5}  {:<14} lifecycle", "agent", "files", "gaps", "protected");
+    println!(
+        "{:<10} {:>5} {:>5}  {:<14} lifecycle",
+        "agent", "files", "gaps", "protected"
+    );
     for row in &r.rows {
-        println!("{:<10} {:>5} {:>5}  {:<14} {}", row.agent.name(), row.files, row.gaps.len(), row.protected, row.lifecycle);
+        println!(
+            "{:<10} {:>5} {:>5}  {:<14} {}",
+            row.agent.name(),
+            row.files,
+            row.gaps.len(),
+            row.protected,
+            row.lifecycle
+        );
     }
     for g in r.rows.iter().flat_map(|row| &row.gaps) {
-        println!("- {} {}: {} (disajikan lewat tempa_context mulai M3; ditegakkan CI)", g.agent.name(), g.kind, g.name);
+        println!(
+            "- {} {}: {} (disajikan lewat tempa_context mulai M3; ditegakkan CI)",
+            g.agent.name(),
+            g.kind,
+            g.name
+        );
     }
     for l in &r.legacy {
         println!("legacy: {l} (boleh dihapus setelah dicek)");
@@ -141,16 +160,26 @@ fn git_add(root: &Path, paths: &[String]) -> tempa_core::Result<()> {
     if paths.is_empty() {
         return Ok(());
     }
-    let out = Command::new("git").arg("-C").arg(root).args(["add", "-A", "--"]).args(paths).output()?;
+    let out = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(["add", "-A", "--"])
+        .args(paths)
+        .output()?;
     if !out.status.success() {
-        return Err(tempa_core::Error(format!("git add gagal: {}", String::from_utf8_lossy(&out.stderr))));
+        return Err(tempa_core::Error(format!(
+            "git add gagal: {}",
+            String::from_utf8_lossy(&out.stderr)
+        )));
     }
     Ok(())
 }
 
 fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
     match cmd {
-        Cmd::Sync { check: true, .. } => Ok(print_findings(&sync::drift_findings(&sync::drift(root)?))),
+        Cmd::Sync { check: true, .. } => {
+            Ok(print_findings(&sync::drift_findings(&sync::drift(root)?)))
+        }
         Cmd::Sync { fix: true, .. } => {
             let (changed, blockers) = sync::sync_fix(root)?;
             if !blockers.is_empty() {
@@ -162,15 +191,28 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
             }
             Ok(false)
         }
-        Cmd::Check { contract_only, base } => {
-            Ok(print_findings(&check::check(root, &check::CheckOpts { contract_only, base })?))
-        }
-        Cmd::Task { cmd: TaskCmd::New { slug } } => {
+        Cmd::Check {
+            contract_only,
+            base,
+        } => Ok(print_findings(&check::check(
+            root,
+            &check::CheckOpts {
+                contract_only,
+                base,
+            },
+        )?)),
+        Cmd::Task {
+            cmd: TaskCmd::New { slug },
+        } => {
             let id = task::task_new(root, &slug)?;
-            println!("task {id} dibuat di branch tempa/{id}; isi plan lalu jalankan tempa task approve");
+            println!(
+                "task {id} dibuat di branch tempa/{id}; isi plan lalu jalankan tempa task approve"
+            );
             Ok(false)
         }
-        Cmd::Task { cmd: TaskCmd::Approve } => {
+        Cmd::Task {
+            cmd: TaskCmd::Approve,
+        } => {
             task::task_approve(root)?;
             println!("plan disetujui");
             Ok(false)
@@ -179,8 +221,23 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
             println!("{}", task::decide(root, &slug)?);
             Ok(false)
         }
-        Cmd::Log { summary, reason, decision, harness, agent } => {
-            task::log(root, &task::LogEntry { summary, reason, decision, harness, agent })?;
+        Cmd::Log {
+            summary,
+            reason,
+            decision,
+            harness,
+            agent,
+        } => {
+            task::log(
+                root,
+                &task::LogEntry {
+                    summary,
+                    reason,
+                    decision,
+                    harness,
+                    agent,
+                },
+            )?;
             println!("entri changes ditambahkan");
             Ok(false)
         }

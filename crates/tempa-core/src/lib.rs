@@ -37,7 +37,12 @@ macro_rules! from_err {
         }
     )*};
 }
-from_err!(std::io::Error, toml::de::Error, toml_edit::TomlError, serde_json::Error);
+from_err!(
+    std::io::Error,
+    toml::de::Error,
+    toml_edit::TomlError,
+    serde_json::Error
+);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Severity {
@@ -56,11 +61,21 @@ pub struct Finding {
 
 impl Finding {
     pub fn error(code: &'static str, path: Option<String>, message: impl Into<String>) -> Self {
-        Finding { code, severity: Severity::Error, path, message: message.into() }
+        Finding {
+            code,
+            severity: Severity::Error,
+            path,
+            message: message.into(),
+        }
     }
 
     pub fn warning(code: &'static str, path: Option<String>, message: impl Into<String>) -> Self {
-        Finding { code, severity: Severity::Warning, path, message: message.into() }
+        Finding {
+            code,
+            severity: Severity::Warning,
+            path,
+            message: message.into(),
+        }
     }
 }
 

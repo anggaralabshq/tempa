@@ -10,10 +10,16 @@ fn default_toml_roundtrips() {
     write_default(dir.path(), "billing");
     let c = Config::load(dir.path()).unwrap();
     assert_eq!(c.project.name, "billing");
-    assert_eq!(c.project.tempa_version.as_deref(), Some(env!("CARGO_PKG_VERSION")));
+    assert_eq!(
+        c.project.tempa_version.as_deref(),
+        Some(env!("CARGO_PKG_VERSION"))
+    );
     assert_eq!(c.docs.plan, "docs/plans/");
     assert_eq!(c.gates.max_diff_lines, 800);
-    assert_eq!(c.gates.protected_paths, vec![".env*", "bitbucket-pipelines.yml", "tempa.toml"]);
+    assert_eq!(
+        c.gates.protected_paths,
+        vec![".env*", "bitbucket-pipelines.yml", "tempa.toml"]
+    );
     assert_eq!(c.agents.enabled.len(), 5);
     assert_eq!(c.headings.context[3], "Area terlarang");
     assert_eq!(c.ci.base, "main");
@@ -32,7 +38,10 @@ fn harness_keeps_file_order() {
     let c = Config::load(dir.path()).unwrap();
     assert_eq!(
         c.harness,
-        vec![("z".to_string(), "1".to_string()), ("a".to_string(), "2".to_string())]
+        vec![
+            ("z".to_string(), "1".to_string()),
+            ("a".to_string(), "2".to_string())
+        ]
     );
 }
 
@@ -52,7 +61,10 @@ fn add_harness_is_idempotent_and_keeps_comments() {
     let text = std::fs::read_to_string(dir.path().join("tempa.toml")).unwrap();
     assert!(text.contains("# lint = "), "{text}");
     let c = Config::load(dir.path()).unwrap();
-    assert_eq!(c.harness, vec![("format".to_string(), "cargo fmt --check".to_string())]);
+    assert_eq!(
+        c.harness,
+        vec![("format".to_string(), "cargo fmt --check".to_string())]
+    );
 }
 
 #[test]

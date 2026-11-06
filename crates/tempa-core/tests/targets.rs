@@ -22,9 +22,18 @@ fn canon() -> Source {
     Source {
         agents_md: "# Billing API\n".into(),
         commands: vec![
-            parse_item("db/migrate.md".into(), "---\ndescription: Buat migrasi\n---\nBuat migrasi untuk $ARGUMENTS\n"),
-            parse_item("review kode.md".into(), "---\ndescription: Review kode\n---\nCek kode.\n"),
-            parse_item("review.md".into(), "---\ndescription: Review diff\n---\nReview perubahan: $ARGUMENTS\n"),
+            parse_item(
+                "db/migrate.md".into(),
+                "---\ndescription: Buat migrasi\n---\nBuat migrasi untuk $ARGUMENTS\n",
+            ),
+            parse_item(
+                "review kode.md".into(),
+                "---\ndescription: Review kode\n---\nCek kode.\n",
+            ),
+            parse_item(
+                "review.md".into(),
+                "---\ndescription: Review diff\n---\nReview perubahan: $ARGUMENTS\n",
+            ),
         ],
         agents: vec![parse_item(
             "tester.md".into(),
@@ -33,7 +42,11 @@ fn canon() -> Source {
         skills: vec![Skill {
             name: "adr".into(),
             files: vec![
-                ("SKILL.md".into(), b"---\nname: adr\ndescription: Menulis ADR\n---\nLangkah menulis ADR.\n".to_vec()),
+                (
+                    "SKILL.md".into(),
+                    b"---\nname: adr\ndescription: Menulis ADR\n---\nLangkah menulis ADR.\n"
+                        .to_vec(),
+                ),
                 ("template.md".into(), b"# ADR\n".to_vec()),
             ],
         }],
@@ -49,7 +62,10 @@ fn has(r: &Rendered, path: &str) -> bool {
 
 fn text(r: &Rendered, path: &str) -> String {
     let f = r.files.iter().find(|f| f.path == path).unwrap_or_else(|| {
-        panic!("{path} not rendered; got {:?}", r.files.iter().map(|f| &f.path).collect::<Vec<_>>())
+        panic!(
+            "{path} not rendered; got {:?}",
+            r.files.iter().map(|f| &f.path).collect::<Vec<_>>()
+        )
     });
     String::from_utf8(f.bytes.clone()).unwrap()
 }
@@ -61,16 +77,23 @@ fn json_of(r: &Rendered, path: &str) -> Value {
 #[test]
 fn claude_shim_and_commands() {
     let r = render(Agent::Claude, &cfg(), &canon());
-    assert_eq!(text(&r, "CLAUDE.md"), format!("{HEADER_MD}\n\n@AGENTS.md\n"));
+    assert_eq!(
+        text(&r, "CLAUDE.md"),
+        format!("{HEADER_MD}\n\n@AGENTS.md\n")
+    );
     assert_eq!(
         text(&r, ".claude/commands/db/migrate.md"),
-        format!("---\ndescription: Buat migrasi\n---\n{HEADER_MD}\nBuat migrasi untuk $ARGUMENTS\n")
+        format!(
+            "---\ndescription: Buat migrasi\n---\n{HEADER_MD}\nBuat migrasi untuk $ARGUMENTS\n"
+        )
     );
     assert!(has(&r, ".claude/commands/review kode.md"));
     assert!(has(&r, ".claude/agents/tester.md"));
     assert_eq!(
         text(&r, ".claude/skills/adr/SKILL.md"),
-        format!("---\nname: adr\ndescription: Menulis ADR\n---\n{HEADER_MD}\nLangkah menulis ADR.\n")
+        format!(
+            "---\nname: adr\ndescription: Menulis ADR\n---\n{HEADER_MD}\nLangkah menulis ADR.\n"
+        )
     );
     assert_eq!(text(&r, ".claude/skills/adr/template.md"), "# ADR\n");
     assert!(r.gaps.is_empty(), "{:?}", r.gaps);
@@ -95,7 +118,13 @@ fn claude_settings_merge_deny_and_keep_hooks() {
     let v = json_of(&r, ".claude/settings.json");
     assert_eq!(
         v["permissions"]["deny"],
-        json!(["Edit(./.env*)", "Bash(rm -rf:*)", "Edit(/.env*)", "Edit(/bitbucket-pipelines.yml)", "Edit(/tempa.toml)"])
+        json!([
+            "Edit(./.env*)",
+            "Bash(rm -rf:*)",
+            "Edit(/.env*)",
+            "Edit(/bitbucket-pipelines.yml)",
+            "Edit(/tempa.toml)"
+        ])
     );
     assert!(v["hooks"].is_object());
 }
@@ -115,9 +144,18 @@ fn mcp_rendered_per_agent() {
     let ro = render(Agent::Opencode, &c, &s);
     let rx = render(Agent::Codex, &c, &s);
     let ru = render(Agent::Cursor, &c, &s);
-    assert_eq!(json_of(&rc, ".mcp.json")["mcpServers"]["pg"]["command"], "npx");
-    assert_eq!(json_of(&rg, ".gemini/settings.json")["context"]["fileName"], json!(["AGENTS.md"]));
-    assert_eq!(json_of(&rg, ".gemini/settings.json")["mcpServers"]["pg"]["command"], "npx");
+    assert_eq!(
+        json_of(&rc, ".mcp.json")["mcpServers"]["pg"]["command"],
+        "npx"
+    );
+    assert_eq!(
+        json_of(&rg, ".gemini/settings.json")["context"]["fileName"],
+        json!(["AGENTS.md"])
+    );
+    assert_eq!(
+        json_of(&rg, ".gemini/settings.json")["mcpServers"]["pg"]["command"],
+        "npx"
+    );
     assert_eq!(
         json_of(&ro, "opencode.json")["mcp"]["pg"],
         json!({"type":"local","command":["npx","-y","x"],"environment":{"DB":"${DB_URL}"}})
@@ -127,13 +165,22 @@ fn mcp_rendered_per_agent() {
     assert!(codex.contains("[mcp_servers.pg]"), "{codex}");
     let parsed: toml::Table = toml::from_str(&codex).unwrap();
     assert_eq!(parsed["mcp_servers"]["pg"]["args"][1].as_str(), Some("x"));
-    assert_eq!(json_of(&ru, ".cursor/mcp.json")["mcpServers"]["pg"]["args"], json!(["-y", "x"]));
+    assert_eq!(
+        json_of(&ru, ".cursor/mcp.json")["mcpServers"]["pg"]["args"],
+        json!(["-y", "x"])
+    );
 }
 
 #[test]
 fn remote_mcp_shapes() {
     let mut src = canon();
-    src.mcp.insert("web".into(), McpServer { url: Some("https://m.example".into()), ..Default::default() });
+    src.mcp.insert(
+        "web".into(),
+        McpServer {
+            url: Some("https://m.example".into()),
+            ..Default::default()
+        },
+    );
     let c = cfg();
     assert_eq!(
         json_of(&render(Agent::Claude, &c, &src), ".mcp.json")["mcpServers"]["web"],
@@ -167,7 +214,10 @@ fn gemini_command_toml() {
     let rg = render(Agent::Gemini, &cfg(), &canon());
     assert_eq!(
         text(&rg, ".gemini/commands/db/migrate.toml"),
-        format!("{}\ndescription = \"Buat migrasi\"\nprompt = \"\"\"\nBuat migrasi untuk {{{{args}}}}\n\"\"\"\n", header_toml())
+        format!(
+            "{}\ndescription = \"Buat migrasi\"\nprompt = \"\"\"\nBuat migrasi untuk {{{{args}}}}\n\"\"\"\n",
+            header_toml()
+        )
     );
 }
 
@@ -185,7 +235,10 @@ fn gemini_prompt_escapes_toml() {
 fn opencode_agent_mode_subagent_without_tools() {
     let ro = render(Agent::Opencode, &cfg(), &canon());
     let t = text(&ro, ".opencode/agents/tester.md");
-    assert!(t.starts_with("---\ndescription: Menulis test\nmode: subagent\n---\n"), "{t}");
+    assert!(
+        t.starts_with("---\ndescription: Menulis test\nmode: subagent\n---\n"),
+        "{t}"
+    );
     assert!(!t.contains("tools:"));
     assert_eq!(
         text(&ro, ".opencode/commands/review.md"),
@@ -198,14 +251,22 @@ fn gemini_agent_name_description_only() {
     let rg = render(Agent::Gemini, &cfg(), &canon());
     assert_eq!(
         text(&rg, ".gemini/agents/tester.md"),
-        format!("---\nname: tester\ndescription: Menulis test\n---\n{HEADER_MD}\nKamu menulis test.\n")
+        format!(
+            "---\nname: tester\ndescription: Menulis test\n---\n{HEADER_MD}\nKamu menulis test.\n"
+        )
     );
 }
 
 #[test]
 fn shared_skills_dir_emitted_once() {
     let all = render_all(&cfg(), &canon());
-    assert_eq!(all.files.iter().filter(|f| f.path == ".agents/skills/adr/SKILL.md").count(), 1);
+    assert_eq!(
+        all.files
+            .iter()
+            .filter(|f| f.path == ".agents/skills/adr/SKILL.md")
+            .count(),
+        1
+    );
     let paths: Vec<_> = all.files.iter().map(|f| f.path.clone()).collect();
     let mut sorted = paths.clone();
     sorted.sort();
@@ -218,25 +279,42 @@ fn render_all_respects_enabled_agents() {
     c.agents.enabled = vec![Agent::Codex];
     let all = render_all(&c, &canon());
     assert!(!all.files.iter().any(|f| f.path == "CLAUDE.md"));
-    assert!(all.files.iter().any(|f| f.path == ".agents/skills/adr/SKILL.md"));
+    assert!(
+        all.files
+            .iter()
+            .any(|f| f.path == ".agents/skills/adr/SKILL.md")
+    );
 }
 
 #[test]
 fn cursor_rule_always_apply() {
     let ru = render(Agent::Cursor, &cfg(), &canon());
     let rule = text(&ru, ".cursor/rules/tempa.mdc");
-    assert!(rule.starts_with("---\ndescription: Project instructions (generated by tempa)\nalwaysApply: true\n---\n"));
+    assert!(rule.starts_with(
+        "---\ndescription: Project instructions (generated by tempa)\nalwaysApply: true\n---\n"
+    ));
     assert!(rule.ends_with("# Billing API\n"));
-    assert_eq!(text(&ru, ".cursor/commands/review.md"), format!("{HEADER_MD}\nReview perubahan: $ARGUMENTS\n"));
+    assert_eq!(
+        text(&ru, ".cursor/commands/review.md"),
+        format!("{HEADER_MD}\nReview perubahan: $ARGUMENTS\n")
+    );
 }
 
 #[test]
 fn gaps_reported_never_silent() {
     let r = render(Agent::Codex, &cfg(), &canon());
     let kinds: BTreeSet<_> = r.gaps.iter().map(|g| g.kind).collect();
-    assert_eq!(kinds, BTreeSet::from(["commands", "agents", "settings-deny"]));
+    assert_eq!(
+        kinds,
+        BTreeSet::from(["commands", "agents", "settings-deny"])
+    );
     assert!(has(&r, ".agents/skills/adr/SKILL.md"));
     assert_eq!(r.gaps.iter().filter(|g| g.kind == "commands").count(), 3);
     let cursor = render(Agent::Cursor, &cfg(), &canon());
-    assert!(cursor.gaps.iter().any(|g| g.kind == "agents" && g.name == "tester.md"));
+    assert!(
+        cursor
+            .gaps
+            .iter()
+            .any(|g| g.kind == "agents" && g.name == "tester.md")
+    );
 }

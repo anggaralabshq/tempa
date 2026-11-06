@@ -53,11 +53,18 @@ struct Out {
 
 impl Out {
     fn file(&mut self, path: impl Into<String>, text: impl Into<Vec<u8>>) {
-        self.r.files.push(OutFile { path: path.into(), bytes: text.into() });
+        self.r.files.push(OutFile {
+            path: path.into(),
+            bytes: text.into(),
+        });
     }
 
     fn gap(&mut self, kind: &'static str, name: &str) {
-        self.r.gaps.push(Gap { agent: self.agent, kind, name: name.to_string() });
+        self.r.gaps.push(Gap {
+            agent: self.agent,
+            kind,
+            name: name.to_string(),
+        });
     }
 }
 
@@ -101,7 +108,10 @@ fn mcp_json(s: &McpServer, remote: impl Fn(&str) -> Value) -> Value {
         return remote(url);
     }
     let mut m = Map::new();
-    m.insert("command".into(), json!(s.command.clone().unwrap_or_default()));
+    m.insert(
+        "command".into(),
+        json!(s.command.clone().unwrap_or_default()),
+    );
     if !s.args.is_empty() {
         m.insert("args".into(), json!(s.args));
     }
@@ -112,11 +122,22 @@ fn mcp_json(s: &McpServer, remote: impl Fn(&str) -> Value) -> Value {
 }
 
 fn mcp_map(src: &Source, remote: impl Fn(&str) -> Value + Copy) -> Value {
-    Value::Object(src.mcp.iter().map(|(n, s)| (n.clone(), mcp_json(s, remote))).collect())
+    Value::Object(
+        src.mcp
+            .iter()
+            .map(|(n, s)| (n.clone(), mcp_json(s, remote)))
+            .collect(),
+    )
 }
 
 /// Write `<path>` with `key` replaced by the MCP map, when there is MCP or a base file.
-fn mcp_file(out: &mut Out, src: &Source, path: &str, key: &str, remote: impl Fn(&str) -> Value + Copy) {
+fn mcp_file(
+    out: &mut Out,
+    src: &Source,
+    path: &str,
+    key: &str,
+    remote: impl Fn(&str) -> Value + Copy,
+) {
     if src.mcp.is_empty() && !src.bases.contains_key(path) {
         return;
     }
@@ -135,7 +156,10 @@ fn skills(out: &mut Out, src: &Source, dir: &str) {
                 let text = String::from_utf8_lossy(bytes);
                 let (front, body) = split_front(&text);
                 let body = crate::md::normalize_eol(body);
-                out.file(path, with_header(front.as_ref().map(|f| f.raw.as_str()), &body));
+                out.file(
+                    path,
+                    with_header(front.as_ref().map(|f| f.raw.as_str()), &body),
+                );
             } else {
                 out.file(path, bytes.clone());
             }
@@ -154,7 +178,10 @@ fn toml_basic(s: &str) -> String {
 }
 
 fn toml_multiline(s: &str) -> String {
-    format!("\"\"\"\n{}\"\"\"", s.replace('\\', "\\\\").replace("\"\"\"", "\"\"\\\""))
+    format!(
+        "\"\"\"\n{}\"\"\"",
+        s.replace('\\', "\\\\").replace("\"\"\"", "\"\"\\\"")
+    )
 }
 
 fn codex_config(out: &mut Out, src: &Source) {
@@ -175,9 +202,15 @@ fn codex_config(out: &mut Out, src: &Source) {
             if let Some(url) = &s.url {
                 t.insert("url", toml_edit::value(url));
             } else {
-                t.insert("command", toml_edit::value(s.command.clone().unwrap_or_default()));
+                t.insert(
+                    "command",
+                    toml_edit::value(s.command.clone().unwrap_or_default()),
+                );
                 if !s.args.is_empty() {
-                    t.insert("args", toml_edit::value(s.args.iter().collect::<toml_edit::Array>()));
+                    t.insert(
+                        "args",
+                        toml_edit::value(s.args.iter().collect::<toml_edit::Array>()),
+                    );
                 }
                 if !s.env.is_empty() {
                     let mut env = toml_edit::InlineTable::new();
@@ -195,7 +228,10 @@ fn codex_config(out: &mut Out, src: &Source) {
 }
 
 pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
-    let mut out = Out { agent, r: Rendered::default() };
+    let mut out = Out {
+        agent,
+        r: Rendered::default(),
+    };
     let o = &mut out;
     match agent {
         Agent::Claude => {
@@ -220,10 +256,19 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 *perms = json!({});
             }
             let perms = perms.as_object_mut().expect("object");
-            let mut deny: Vec<Value> = perms.get("deny").and_then(|d| d.as_array().cloned()).unwrap_or_default();
-            let seen: BTreeSet<String> = deny.iter().filter_map(|d| d.as_str().map(String::from)).collect();
+            let mut deny: Vec<Value> = perms
+                .get("deny")
+                .and_then(|d| d.as_array().cloned())
+                .unwrap_or_default();
+            let seen: BTreeSet<String> = deny
+                .iter()
+                .filter_map(|d| d.as_str().map(String::from))
+                .collect();
             for p in &cfg.gates.protected_paths {
-                let rule = format!("Edit(/{})", p.trim_start_matches("./").trim_start_matches('/'));
+                let rule = format!(
+                    "Edit(/{})",
+                    p.trim_start_matches("./").trim_start_matches('/')
+                );
                 if !seen.contains(&rule) {
                     deny.push(json!(rule));
                 }
@@ -231,7 +276,13 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
             perms.insert("deny".into(), Value::Array(deny));
             o.file(path, pretty(&v));
 
-            mcp_file(o, src, ".mcp.json", "mcpServers", |u| json!({"type":"http","url":u}));
+            mcp_file(
+                o,
+                src,
+                ".mcp.json",
+                "mcpServers",
+                |u| json!({"type":"http","url":u}),
+            );
         }
         Agent::Codex => {
             for c in &src.commands {
@@ -250,7 +301,10 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 if let Some(d) = front_get(c, "description") {
                     t += &format!("description = {}\n", toml_basic(d));
                 }
-                t += &format!("prompt = {}\n", toml_multiline(&c.body.replace("$ARGUMENTS", "{{args}}")));
+                t += &format!(
+                    "prompt = {}\n",
+                    toml_multiline(&c.body.replace("$ARGUMENTS", "{{args}}"))
+                );
                 let rel = c.rel.strip_suffix(".md").unwrap_or(&c.rel);
                 o.file(format!(".gemini/commands/{rel}.toml"), t);
             }
@@ -260,7 +314,10 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 if let Some(d) = front_get(a, "description") {
                     pairs.push(("description", d));
                 }
-                o.file(format!(".gemini/agents/{}", a.rel), with_header(Some(&front_of(&pairs)), &a.body));
+                o.file(
+                    format!(".gemini/agents/{}", a.rel),
+                    with_header(Some(&front_of(&pairs)), &a.body),
+                );
             }
             skills(o, src, ".agents/skills");
             deny_gaps(o, cfg);
@@ -271,7 +328,9 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
             if !ctx.is_object() {
                 *ctx = json!({});
             }
-            ctx.as_object_mut().expect("object").insert("fileName".into(), json!([cfg.docs.context]));
+            ctx.as_object_mut()
+                .expect("object")
+                .insert("fileName".into(), json!([cfg.docs.context]));
             if !src.mcp.is_empty() {
                 v.insert("mcpServers".into(), mcp_map(src, |u| json!({"httpUrl":u})));
             }
@@ -280,12 +339,18 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
         Agent::Opencode => {
             for c in &src.commands {
                 let front = front_get(c, "description").map(|d| front_of(&[("description", d)]));
-                o.file(format!(".opencode/commands/{}", c.rel), with_header(front.as_deref(), &c.body));
+                o.file(
+                    format!(".opencode/commands/{}", c.rel),
+                    with_header(front.as_deref(), &c.body),
+                );
             }
             for a in &src.agents {
                 let desc = front_get(a, "description").unwrap_or_else(|| stem(&a.rel));
                 let front = front_of(&[("description", desc), ("mode", "subagent")]);
-                o.file(format!(".opencode/agents/{}", a.rel), with_header(Some(&front), &a.body));
+                o.file(
+                    format!(".opencode/agents/{}", a.rel),
+                    with_header(Some(&front), &a.body),
+                );
             }
             skills(o, src, ".agents/skills");
             deny_gaps(o, cfg);
@@ -323,16 +388,28 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 ("description", "Project instructions (generated by tempa)"),
                 ("alwaysApply", "true"),
             ]);
-            o.file(".cursor/rules/tempa.mdc", with_header(Some(&front), &src.agents_md));
+            o.file(
+                ".cursor/rules/tempa.mdc",
+                with_header(Some(&front), &src.agents_md),
+            );
             for c in &src.commands {
-                o.file(format!(".cursor/commands/{}", c.rel), with_header(None, &c.body));
+                o.file(
+                    format!(".cursor/commands/{}", c.rel),
+                    with_header(None, &c.body),
+                );
             }
             for a in &src.agents {
                 o.gap("agents", &a.rel);
             }
             skills(o, src, ".agents/skills");
             deny_gaps(o, cfg);
-            mcp_file(o, src, ".cursor/mcp.json", "mcpServers", |u| json!({"type":"http","url":u}));
+            mcp_file(
+                o,
+                src,
+                ".cursor/mcp.json",
+                "mcpServers",
+                |u| json!({"type":"http","url":u}),
+            );
         }
     }
     out.r

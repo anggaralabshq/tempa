@@ -1,4 +1,5 @@
 import { Channel, invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 export type PtyHandlers = { onData: (bytes: Uint8Array) => void; onExit: (code: number) => void };
 
@@ -36,3 +37,13 @@ export const contractStatus = (root: string) => invoke<ContractStatus>("contract
 export const contractPreview = (root: string, action: "absorb" | "discard") =>
   invoke<string[]>("contract_preview", { root, action });
 export const contractRun = (root: string, action: ContractAction) => invoke<string[]>("contract_run", { root, action });
+
+/** What the watcher reports after a source sync or a change in drift. */
+export type ContractUpdate = { root: string; synced: string[]; conflicts: string[]; drift: number; error: string | null };
+export const watchStart = (root: string) => invoke("watch_start", { root });
+export const watchStop = (root: string) => invoke("watch_stop", { root });
+export const onContractChanged = (cb: (u: ContractUpdate) => void) =>
+  listen<ContractUpdate>("contract-changed", (e) => cb(e.payload));
+/** Sidebar badge: drift plus contract errors. */
+export const problemCount = (s: ContractStatus) =>
+  s.drift.length + s.findings.filter((f) => f.severity === "error").length;

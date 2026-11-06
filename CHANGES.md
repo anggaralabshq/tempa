@@ -250,3 +250,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-harness-git-env
+- Summary: Harness commands no longer inherit the hook's GIT_DIR and related variables
+- Reason: Pushing from a worktree let the test suite's temp-repo git calls write into the pushing repo (bare flag, user config, branch commit)
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

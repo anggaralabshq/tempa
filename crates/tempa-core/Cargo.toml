@@ -4,6 +4,10 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+description = "Library behind the tempa CLI: render one agent contract into each coding agent's native files"
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }

@@ -10,5 +10,6 @@
 ## Gate yang berlaku
 
 - Pre-commit: `tempa sync --fix` (sync dari sumber yang sudah di-stage, blokir drift).
-- Pre-push: `tempa check` (kontrak + harness: format, lint, test).
-- CI belum dipasang; reviewer menjalankan `tempa check --base main` di branch PR sebelum approve.
+- Pre-push: `tempa check` (kontrak + harness: format, lint, test CLI; typecheck, Vitest, clippy dan test backend aplikasi `app/`). Butuh Bun dan dependency sistem Tauri.
+- CI: `.github/workflows/app-windows.yml` menjalankan test backend aplikasi di Windows untuk PR yang menyentuh `app/` atau `tempa-core`. Selebihnya reviewer menjalankan `tempa check --base main` di branch PR sebelum approve.
+- Perubahan UI aplikasi: dicek manual di aplikasi yang berjalan (`cd app && bun tauri dev`) sebelum review akhir milestone.

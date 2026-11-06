@@ -34,7 +34,7 @@ fn check_slug(slug: &str) -> Result<()> {
     }
 }
 
-fn plan_path(cfg: &Config, id: &str) -> String {
+pub fn plan_path(cfg: &Config, id: &str) -> String {
     format!("{}{id}.md", dir(&cfg.docs.plan))
 }
 

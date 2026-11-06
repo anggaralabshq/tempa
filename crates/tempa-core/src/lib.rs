@@ -8,6 +8,7 @@ pub mod doctor;
 pub mod gitx;
 pub mod import;
 pub mod init;
+pub mod mcp;
 pub mod md;
 pub mod source;
 pub mod sync;

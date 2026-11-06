@@ -48,3 +48,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-app-scaffold
+- Ringkasan: Desktop app scaffold (Tauri 2, React, Bun)
+- Alasan: M2 shell: separate workspace so the CLI never builds Tauri
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

@@ -502,3 +502,55 @@ fn copilot_is_a_known_agent() {
         .unwrap();
     assert!(c.agents.enabled.contains(&Agent::Copilot));
 }
+
+#[test]
+fn agents_in_subfolders_do_not_overwrite_each_other() {
+    let mut src = canon();
+    src.agents = vec![
+        parse_item("backend/reviewer.md".into(), "B.\n"),
+        parse_item("frontend/reviewer.md".into(), "F.\n"),
+    ];
+    let codex = render(Agent::Codex, &cfg(), &src);
+    assert!(has(&codex, ".codex/agents/backend-reviewer.toml"));
+    assert!(has(&codex, ".codex/agents/frontend-reviewer.toml"));
+    let copilot = render(Agent::Copilot, &cfg(), &src);
+    assert!(has(&copilot, ".github/agents/backend-reviewer.agent.md"));
+    assert!(has(&copilot, ".github/agents/frontend-reviewer.agent.md"));
+}
+
+#[test]
+fn copilot_command_skill_collisions_are_gaps() {
+    let mut src = canon();
+    src.commands = vec![
+        parse_item("db/migrate.md".into(), "A.\n"),
+        parse_item("db-migrate.md".into(), "B.\n"),
+        parse_item("lint.md".into(), "C.\n"),
+        parse_item("日本.md".into(), "D.\n"),
+    ];
+    src.skills[0].name = "Lint".into();
+    let r = render(Agent::Copilot, &cfg(), &src);
+    let skill_files: Vec<_> = r
+        .files
+        .iter()
+        .filter(|f| f.path.starts_with(".github/skills/"))
+        .map(|f| f.path.as_str())
+        .collect();
+    assert_eq!(
+        skill_files,
+        [".github/skills/db-migrate/SKILL.md"],
+        "{skill_files:?}"
+    );
+    let gaps: Vec<_> = r
+        .gaps
+        .iter()
+        .filter(|g| g.kind == "commands")
+        .map(|g| g.name.as_str())
+        .collect();
+    assert_eq!(gaps.len(), 3, "{gaps:?}");
+    assert!(
+        gaps.iter().any(|g| g.starts_with("db-migrate.md")),
+        "{gaps:?}"
+    );
+    assert!(gaps.iter().any(|g| g.starts_with("lint.md")), "{gaps:?}");
+    assert!(gaps.iter().any(|g| g.starts_with("日本.md")), "{gaps:?}");
+}

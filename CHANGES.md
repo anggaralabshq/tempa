@@ -278,3 +278,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-name-collisions
+- Summary: Report agent and Copilot skill name collisions instead of dropping items
+- Reason: m4 review: same-named items in subfolders silently overwrote each other
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

@@ -366,6 +366,13 @@ fn config_bases(root: &Path, plan: &mut Plan) -> Result<()> {
 
 /// First matching keyword group → harness name.
 fn classify(cmd: &str) -> Option<&'static str> {
+    // Hooks that rewrite files are auto-fixers, not gates.
+    if ["--fix", "--write", " -w", "--apply"]
+        .iter()
+        .any(|f| cmd.contains(f))
+    {
+        return None;
+    }
     const GROUPS: [(&str, &[&str]); 4] = [
         ("lint", &["eslint", "biome", "ruff", "clippy", "lint"]),
         ("format", &["prettier", "fmt", "format"]),

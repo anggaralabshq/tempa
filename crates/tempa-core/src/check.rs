@@ -98,6 +98,13 @@ pub fn check(root: &Path, opts: &CheckOpts) -> Result<Vec<Finding>> {
     }
 
     if !opts.contract_only {
+        if cfg.harness.is_empty() {
+            f.push(Finding::warning(
+                "harness.empty",
+                Some(crate::config::FILE.into()),
+                "[harness] kosong — tidak ada lint/test yang dijalankan; isi perintahnya di tempa.toml",
+            ));
+        }
         f.extend(run_harness(root, &cfg)?);
     }
     Ok(f)
@@ -214,29 +221,44 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
 /// Run `[harness]` commands in order; stop at the first failure.
 pub fn run_harness(root: &Path, cfg: &Config) -> Result<Vec<Finding>> {
     for (name, cmd) in &cfg.harness {
-        let status = if cfg!(windows) {
-            Command::new("cmd")
-                .args(["/C", cmd])
-                .current_dir(root)
-                .status()
-        } else {
-            Command::new("sh")
-                .args(["-c", cmd])
-                .current_dir(root)
-                .status()
-        }
-        .map_err(|e| Error(format!("harness {name} tidak bisa dijalankan: {e}")))?;
-        if !status.success() {
-            let code = status
+        let out = shell(cmd)
+            .current_dir(root)
+            .output()
+            .map_err(|e| Error(format!("harness {name} tidak bisa dijalankan: {e}")))?;
+        if !out.status.success() {
+            let code = out
+                .status
                 .code()
                 .map(|c| c.to_string())
                 .unwrap_or_else(|| "signal".into());
+            let text = String::from_utf8_lossy(&out.stdout).to_string()
+                + &String::from_utf8_lossy(&out.stderr);
+            let lines: Vec<&str> = text.lines().collect();
+            let tail = lines[lines.len().saturating_sub(20)..].join("\n");
             return Ok(vec![Finding::error(
                 "harness.failed",
                 Some(name.clone()),
-                format!("`{cmd}` gagal (exit {code})"),
+                format!("`{cmd}` gagal (exit {code}); 20 baris terakhir:\n{tail}"),
             )]);
         }
     }
     Ok(vec![])
+}
+
+/// `sh -c <cmd>`, or `cmd /C <cmd>` on Windows passed verbatim (Rust's default
+/// argument quoting would mangle inner quotes for cmd.exe).
+fn shell(cmd: &str) -> Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let mut c = Command::new("cmd");
+        c.arg("/C").raw_arg(cmd);
+        c
+    }
+    #[cfg(not(windows))]
+    {
+        let mut c = Command::new("sh");
+        c.args(["-c", cmd]);
+        c
+    }
 }

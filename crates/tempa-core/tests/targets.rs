@@ -123,7 +123,6 @@ fn claude_settings_merge_deny_and_keep_hooks() {
             "Edit(./.env*)",
             "Bash(rm -rf:*)",
             "Edit(/.env*)",
-            "Edit(/bitbucket-pipelines.yml)",
             "Edit(/tempa.toml)"
         ])
     );

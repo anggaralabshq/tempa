@@ -109,12 +109,18 @@ pub fn diff_lines(root: &Path, base: &str, exclude: &BTreeSet<String>) -> Result
 }
 
 pub fn authors(root: &Path, base: &str) -> Result<BTreeSet<String>> {
-    Ok(
-        git(root, &["log", "--format=%an", &format!("{base}..HEAD")])?
-            .lines()
-            .map(String::from)
-            .collect(),
-    )
+    Ok(git(
+        root,
+        &[
+            "log",
+            "--no-merges",
+            "--format=%an",
+            &format!("{base}..HEAD"),
+        ],
+    )?
+    .lines()
+    .map(String::from)
+    .collect())
 }
 
 pub fn user_name(root: &Path) -> Result<String> {

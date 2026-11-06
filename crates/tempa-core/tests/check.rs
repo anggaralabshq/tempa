@@ -143,6 +143,13 @@ fn new_dependency_needs_decision() {
 #[test]
 fn schema_path_needs_decision() {
     let d = repo_on("tempa/20261106-mig");
+    let cfg = std::fs::read_to_string(d.path().join("tempa.toml"))
+        .unwrap()
+        .replace(
+            "schema_paths          = []",
+            "schema_paths          = [\"migrations/**\"]",
+        );
+    write(d.path(), "tempa.toml", &cfg);
     write(d.path(), "migrations/001.sql", "create table a();\n");
     add_plan_and_change(d.path(), "20261106-mig");
     commit(d.path(), "mig");

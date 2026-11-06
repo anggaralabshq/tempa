@@ -5,11 +5,12 @@ import "@xterm/xterm/css/xterm.css";
 import { useEffect, useRef } from "react";
 import { ptyKill, ptyResize, ptySpawn, ptyWrite } from "../lib/ipc";
 
-type Props = { cwd: string | null; onExit?: (code: number) => void };
+type Props = { cwd: string | null; focused?: boolean; onExit?: (code: number) => void };
 
 /** One xterm bound to one pty. Unmounting kills the shell. */
-export default function Terminal({ cwd, onExit }: Props) {
+export default function Terminal({ cwd, focused = true, onExit }: Props) {
   const host = useRef<HTMLDivElement>(null);
+  const termRef = useRef<XTerm | null>(null);
   const exitRef = useRef(onExit);
   exitRef.current = onExit;
 
@@ -26,6 +27,7 @@ export default function Terminal({ cwd, onExit }: Props) {
     term.loadAddon(fit);
     term.loadAddon(new WebLinksAddon());
     term.open(el);
+    termRef.current = term;
     fit.fit();
 
     let id: number | null = null;
@@ -42,11 +44,11 @@ export default function Terminal({ cwd, onExit }: Props) {
     );
     const input = term.onData((d) => id !== null && void ptyWrite(id, d));
     const resize = term.onResize(({ cols, rows }) => id !== null && void ptyResize(id, cols, rows));
-    const observer = new ResizeObserver(() => fit.fit());
+    // Hidden tabs have no size; fit when they are shown again.
+    const observer = new ResizeObserver(() => el.clientWidth > 0 && fit.fit());
     observer.observe(el);
-    term.focus();
-
     return () => {
+      termRef.current = null;
       disposed = true;
       observer.disconnect();
       input.dispose();
@@ -55,6 +57,10 @@ export default function Terminal({ cwd, onExit }: Props) {
       term.dispose();
     };
   }, [cwd]);
+
+  useEffect(() => {
+    if (focused) termRef.current?.focus();
+  }, [focused]);
 
   return <div ref={host} className="h-full w-full p-1" />;
 }

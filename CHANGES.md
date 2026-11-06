@@ -62,3 +62,10 @@
 - Decision: docs/decisions/2026-11-06-desktop-stack-tauri.md
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-app-tabs-panes
+- Ringkasan: Tabs and split panes
+- Alasan: M2: several agents and shells side by side per project
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

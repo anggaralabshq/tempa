@@ -43,6 +43,8 @@ pub fn managed_dirs(agent: Agent) -> &'static [&'static str] {
         Agent::Gemini => &[".gemini/commands", ".gemini/agents", ".agents/skills"],
         Agent::Opencode => &[".opencode/commands", ".opencode/agents", ".agents/skills"],
         Agent::Cursor => &[".cursor/commands", ".cursor/agents", ".agents/skills"],
+        // Never `.github` itself: it holds workflows and other repo files.
+        Agent::Copilot => &[".github/agents", ".github/skills", ".agents/skills"],
     }
 }
 
@@ -205,6 +207,20 @@ fn item_raw(item: &Item) -> String {
 fn stem(rel: &str) -> &str {
     let name = rel.rsplit('/').next().unwrap_or(rel);
     name.strip_suffix(".md").unwrap_or(name)
+}
+
+/// Copilot skill name: lowercase letters, digits and hyphens (docs: must match the folder).
+fn skill_name(rel: &str) -> String {
+    let raw = rel.strip_suffix(".md").unwrap_or(rel).to_lowercase();
+    let mut out = String::new();
+    for ch in raw.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch);
+        } else if !out.ends_with('-') {
+            out.push('-');
+        }
+    }
+    out.trim_matches('-').to_string()
 }
 
 fn base_json(src: &Source, path: &str) -> Map<String, Value> {
@@ -657,6 +673,64 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 if !src.mcp.is_empty() {
                     let mut servers = mcp_map(src, |u| json!({"type":"http","url":u}));
                     cursor_env(&mut servers);
+                    v.insert("mcpServers".into(), servers);
+                }
+                o.file(path, pretty(&v));
+            }
+        }
+        Agent::Copilot => {
+            // Context: Copilot reads AGENTS.md itself (docs.github.com/en/copilot/reference/
+            // custom-instructions-support); a copilot-instructions.md would load it twice.
+            let taken: BTreeSet<&str> = src.skills.iter().map(|s| s.name.as_str()).collect();
+            for c in &src.commands {
+                // Prompt files are not loaded by the Copilot harness or CLI; user-invoked skills are.
+                let name = skill_name(&c.rel);
+                if taken.contains(name.as_str()) {
+                    o.gap(
+                        "commands",
+                        &format!("{} (a skill named {name} exists)", c.rel),
+                    );
+                    continue;
+                }
+                if (1..=9).any(|n| c.body.contains(&format!("${n}"))) {
+                    o.gap(
+                        "commands",
+                        &format!("{} ($1..$9 not supported by Copilot)", c.rel),
+                    );
+                }
+                let desc = front_get(c, "description").unwrap_or(&name);
+                let front = front_of(&[
+                    ("name", &name),
+                    ("description", desc),
+                    ("disable-model-invocation", "true"),
+                ]);
+                let body = c.body.replace("$ARGUMENTS", "(the text after the command)");
+                o.file(
+                    format!(".github/skills/{name}/SKILL.md"),
+                    with_header(Some(&front), &body),
+                );
+            }
+            for a in &src.agents {
+                o.file(
+                    format!(".github/agents/{}.agent.md", stem(&a.rel)),
+                    named_agent(a),
+                );
+            }
+            skills(o, src, ".agents/skills");
+            deny_gaps(o, cfg);
+
+            let path = ".github/mcp.json";
+            if !src.mcp.is_empty() || src.bases.contains_key(path) {
+                let mut v = base_json(src, path);
+                if !src.mcp.is_empty() {
+                    let mut servers = mcp_map(src, |u| json!({"type":"http","url":u}));
+                    for s in servers.as_object_mut().expect("object").values_mut() {
+                        s.as_object_mut()
+                            .expect("object")
+                            .entry("type")
+                            .or_insert_with(|| json!("local"));
+                        s["tools"] = json!(["*"]);
+                    }
                     v.insert("mcpServers".into(), servers);
                 }
                 o.file(path, pretty(&v));

@@ -195,7 +195,7 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
         }
     }
 
-    let mut exclude: BTreeSet<String> = Lock::load(root).files.into_keys().collect();
+    let mut exclude: BTreeSet<String> = Lock::load(root)?.files.into_keys().collect();
     exclude.insert(LOCK.to_string());
     let lines = gitx::diff_lines(root, base, &exclude)?;
     if lines > g.max_diff_lines {

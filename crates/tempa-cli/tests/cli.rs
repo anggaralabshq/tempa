@@ -77,6 +77,7 @@ fn sync_fix_stages_outputs() {
         ".tempa/commands/review.md",
         "---\ndescription: R\n---\nreview v2\n",
     );
+    git(d.path(), &["add", "-A"]);
     let o = tempa(d.path(), &["sync", "--fix"]);
     assert_eq!(o.status.code(), Some(0), "{}", stdout(&o));
     assert!(
@@ -88,6 +89,7 @@ fn sync_fix_stages_outputs() {
 fn sync_fix_blocks_direct_edit_with_import_hint() {
     let d = canon_repo();
     tempa(d.path(), &["sync"]);
+    git(d.path(), &["add", "-A"]);
     write(d.path(), ".claude/commands/baru.md", "x\n");
     let o = tempa(d.path(), &["sync", "--fix"]);
     assert_eq!(o.status.code(), Some(1));
@@ -253,4 +255,41 @@ fn doctor_prints_table_and_exits_0_even_with_drift() {
     );
     assert!(out.contains("jalankan tempa init"), "{out}");
     assert!(out.contains("drift: 1"), "{out}");
+}
+
+#[test]
+fn init_refuses_claude_repo_and_keeps_claude_md() {
+    let d = tempfile::tempdir().unwrap();
+    git(d.path(), &["init", "-q", "-b", "main"]);
+    write(d.path(), "CLAUDE.md", "# Billing\n\nRust.\n");
+    let o = tempa(d.path(), &["init"]);
+    assert_eq!(o.status.code(), Some(2), "{}", stdout(&o));
+    assert!(stdout(&o).contains("tempa import --yes"), "{}", stdout(&o));
+    assert_eq!(
+        std::fs::read_to_string(d.path().join("CLAUDE.md")).unwrap(),
+        "# Billing\n\nRust.\n"
+    );
+    assert!(!d.path().join("tempa.toml").exists());
+}
+
+#[test]
+fn sync_fix_stages_lock() {
+    let d = canon_repo();
+    tempa(d.path(), &["sync"]);
+    git(d.path(), &["add", "-A"]);
+    git(d.path(), &["commit", "-qm", "init"]);
+    write(
+        d.path(),
+        ".tempa/commands/review.md",
+        "---\ndescription: R\n---\nreview v2\n",
+    );
+    git(d.path(), &["add", "-A"]);
+    let o = tempa(d.path(), &["sync", "--fix"]);
+    assert_eq!(o.status.code(), Some(0), "{}", stdout(&o));
+    assert!(git(d.path(), &["diff", "--cached", "--name-only"]).contains(".tempa/lock.json"));
+    let status = git(d.path(), &["status", "--porcelain"]);
+    assert!(
+        status.lines().all(|l| l.as_bytes()[1] == b' '),
+        "ada yang belum di-stage:\n{status}"
+    );
 }

@@ -17,6 +17,7 @@ fn canon() -> Source {
             args: vec!["-y".into(), "x".into()],
             env: BTreeMap::from([("DB".to_string(), "${DB_URL}".to_string())]),
             url: None,
+            ..Default::default()
         },
     );
     Source {
@@ -158,7 +159,7 @@ fn mcp_rendered_per_agent() {
     );
     assert_eq!(
         json_of(&ro, "opencode.json")["mcp"]["pg"],
-        json!({"type":"local","command":["npx","-y","x"],"environment":{"DB":"${DB_URL}"}})
+        json!({"type":"local","command":["npx","-y","x"],"environment":{"DB":"{env:DB_URL}"}})
     );
     let codex = text(&rx, ".codex/config.toml");
     assert!(codex.starts_with(&header_toml()), "{codex}");
@@ -306,7 +307,7 @@ fn gaps_reported_never_silent() {
     let kinds: BTreeSet<_> = r.gaps.iter().map(|g| g.kind).collect();
     assert_eq!(
         kinds,
-        BTreeSet::from(["commands", "agents", "settings-deny"])
+        BTreeSet::from(["commands", "agents", "settings-deny", "mcp"])
     );
     assert!(has(&r, ".agents/skills/adr/SKILL.md"));
     assert_eq!(r.gaps.iter().filter(|g| g.kind == "commands").count(), 3);

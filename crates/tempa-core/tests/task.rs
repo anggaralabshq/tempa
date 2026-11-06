@@ -248,3 +248,26 @@ fn legacy_change_fields_still_pass_the_contract() {
         "{f:?}"
     );
 }
+
+#[test]
+fn detached_head_is_not_recorded_as_task_base() {
+    let d = valid_repo();
+    git(d.path(), &["switch", "-q", "--detach"]);
+    task_new(d.path(), "x").unwrap();
+    let cfg = tempa_core::config::Config::load(d.path()).unwrap();
+    assert_eq!(
+        tempa_core::gitx::base_name(d.path(), &cfg, None),
+        cfg.ci.base
+    );
+}
+
+#[test]
+fn pr_body_reverify_uses_the_task_base() {
+    let d = valid_repo();
+    git(d.path(), &["switch", "-q", "-c", "m4"]);
+    let id = task_new(d.path(), "x").unwrap();
+    fill_plan(d.path(), &id);
+    log(d.path(), &entry("pass")).unwrap();
+    let b = pr_body(d.path()).unwrap();
+    assert!(b.contains("tempa check --base m4"), "{b}");
+}

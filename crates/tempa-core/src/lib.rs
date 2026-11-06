@@ -10,6 +10,7 @@ pub mod md;
 pub mod source;
 pub mod sync;
 pub mod targets;
+pub mod task;
 
 use std::fmt;
 

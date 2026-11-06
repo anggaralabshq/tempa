@@ -104,3 +104,24 @@ fn check_base_unavailable_is_error_in_pipelines() {
     assert!(stdout(&ci).contains("error[git.base_unavailable]"), "{}", stdout(&ci));
     assert_eq!(ci.status.code(), Some(1));
 }
+
+#[test]
+fn workflow_commands() {
+    let d = canon_repo();
+    tempa(d.path(), &["sync"]);
+    git(d.path(), &["add", "-A"]);
+    git(d.path(), &["commit", "-qm", "init"]);
+    let o = tempa(d.path(), &["task", "new", "add-invoice"]);
+    assert_eq!(o.status.code(), Some(0), "{}", stdout(&o));
+    assert!(git(d.path(), &["branch", "--show-current"]).starts_with("tempa/"));
+    assert_eq!(tempa(d.path(), &["task", "approve"]).status.code(), Some(0));
+    let o = tempa(d.path(), &["decide", "invoice-numbering"]);
+    assert!(stdout(&o).contains("docs/decisions/"), "{}", stdout(&o));
+    let o = tempa(d.path(), &["log", "--summary", "s", "--reason", "r", "--agent", "codex / gpt-5"]);
+    assert_eq!(o.status.code(), Some(0), "{}", stdout(&o));
+    assert!(std::fs::read_to_string(d.path().join("CHANGES.md")).unwrap().contains("- Harness: belum"));
+    let o = tempa(d.path(), &["log", "--summary", "s", "--reason", "r", "--agent", "a", "--harness", "ok"]);
+    assert_eq!(o.status.code(), Some(2));
+    let o = tempa(d.path(), &["pr-body"]);
+    assert!(stdout(&o).contains("## Agent + model\n\ncodex / gpt-5"), "{}", stdout(&o));
+}

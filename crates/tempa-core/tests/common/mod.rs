@@ -49,3 +49,23 @@ pub fn write(dir: &Path, rel: &str, text: &str) {
 pub fn read(dir: &Path, rel: &str) -> String {
     std::fs::read_to_string(dir.join(rel)).unwrap_or_else(|e| panic!("read {rel}: {e}"))
 }
+
+pub const VALID_AGENTS: &str = "## Stack\nx\n## Perintah\nx\n## Konvensi\nx\n## Area terlarang\nx\n";
+pub const VALID_HARNESS: &str = "## Definisi selesai\nx\n## Gate yang berlaku\nx\n";
+
+/// Contract-valid repo committed on `main` (synced, no drift).
+pub fn valid_repo() -> tempfile::TempDir {
+    let d = tempfile::tempdir().unwrap();
+    let p = d.path();
+    git_init(p);
+    write(p, "tempa.toml", &tempa_core::config::default_toml("x"));
+    write(p, "AGENTS.md", VALID_AGENTS);
+    write(p, "HARNESS.md", VALID_HARNESS);
+    write(p, "CHANGES.md", "# Changes\n");
+    write(p, "docs/plans/.gitkeep", "");
+    write(p, "docs/decisions/.gitkeep", "");
+    tempa_core::sync::sync(p).unwrap();
+    git(p, &["add", "-A"]);
+    git(p, &["commit", "-qm", "init"]);
+    d
+}

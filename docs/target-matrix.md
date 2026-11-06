@@ -6,10 +6,10 @@ Dipakai oleh `tempa sync` (`crates/tempa-core/src/targets.rs`). Perbarui file in
 |---|---|---|---|---|---|
 | context | `CLAUDE.md` = header + `@AGENTS.md` | native `AGENTS.md` | `.gemini/settings.json` → `context.fileName = ["AGENTS.md"]` | native `AGENTS.md` | native `AGENTS.md` (root dan subfolder) |
 | commands | `.claude/commands/<rel>` (md + frontmatter, `$ARGUMENTS`) | **gap** — custom prompts deprecated, hanya user-level `~/.codex/prompts` | `.gemini/commands/<rel>.toml` (`description`, `prompt`, `{{args}}`; subfolder → `:`) | `.opencode/commands/<rel>` (md + `description`, `$ARGUMENTS`) | `.cursor/commands/<rel>` (md tanpa frontmatter) — *belum terkonfirmasi docs, lihat catatan* |
-| agents | `.claude/agents/<rel>` | **gap** | `.gemini/agents/<rel>` (frontmatter `name`, `description`) | `.opencode/agents/<rel>` (frontmatter `description`, `mode: subagent`) | `.cursor/agents/<rel>` (frontmatter `name`, `description`); tidak ditulis bila Claude aktif karena Cursor juga membaca `.claude/agents/` |
+| agents | `.claude/agents/<rel>` | `.codex/agents/<stem>.toml` (`name`, `description`, `developer_instructions` = isi) | `.gemini/agents/<rel>` (frontmatter `name`, `description`) | `.opencode/agents/<rel>` (frontmatter `description`, `mode: subagent`) | `.cursor/agents/<rel>` (frontmatter `name`, `description`); tidak ditulis bila Claude atau Codex aktif karena Cursor juga membaca `.claude/agents/` dan `.codex/agents/` |
 | skills | `.claude/skills/<name>/` | `.agents/skills/<name>/` | `.agents/skills/<name>/` (alias resmi `.gemini/skills`) | `.agents/skills/<name>/` | `.agents/skills/<name>/` |
 | mcp | `.mcp.json` `mcpServers` | `.codex/config.toml` `[mcp_servers.<name>]` (`command`, `args`, `env` / `url`; hanya proyek trusted) | `.gemini/settings.json` `mcpServers` | `opencode.json` `mcp` (`type: "local"`, `command: [..]`, `environment` / `type: "remote"`, `url`) | `.cursor/mcp.json` `mcpServers`, `${VAR}` → `${env:VAR}` |
-| settings-deny | `.claude/settings.json` `permissions.deny` `Edit(/<path>)` | **gap** | **gap** | **gap** | `.cursor/cli.json` `permissions.deny` `Write(<glob>)` — hanya Cursor CLI; IDE tetap mengandalkan CI |
+| settings-deny | `.claude/settings.json` `permissions.deny` `Edit(/<path>)` | **gap** — permissions (beta) hanya untuk command ber-sandbox | **gap** — `.gemini/policies` di workspace diabaikan | `opencode.json` `permission.edit` `{"*": <default user>, "<glob>": "deny"}` (glob relatif root belum terverifikasi docs) | `.cursor/cli.json` `permissions.deny` `Write(<glob>)` — hanya Cursor CLI; IDE tetap mengandalkan CI |
 
 ## Catatan
 
@@ -23,8 +23,8 @@ Dipakai oleh `tempa sync` (`crates/tempa-core/src/targets.rs`). Perbarui file in
 
 ## Sumber
 
-- Codex: https://learn.chatgpt.com/docs/build-skills, https://learn.chatgpt.com/docs/custom-prompts, https://learn.chatgpt.com/docs/config-file/config-reference
-- Gemini CLI: https://geminicli.com/docs/cli/skills, https://geminicli.com/docs/cli/custom-commands, https://geminicli.com/docs/core/subagents/, https://geminicli.com/docs/cli/gemini-md
-- OpenCode: https://opencode.ai/docs/commands, https://opencode.ai/docs/agents, https://opencode.ai/docs/skills, https://opencode.ai/docs/mcp-servers
+- Codex: https://learn.chatgpt.com/docs/agent-configuration/subagents, https://learn.chatgpt.com/docs/permissions, https://learn.chatgpt.com/docs/build-skills, https://learn.chatgpt.com/docs/custom-prompts, https://learn.chatgpt.com/docs/config-file/config-reference
+- Gemini CLI: https://geminicli.com/docs/reference/policy-engine, https://geminicli.com/docs/tools/mcp-server, https://geminicli.com/docs/cli/skills, https://geminicli.com/docs/cli/custom-commands, https://geminicli.com/docs/core/subagents/, https://geminicli.com/docs/cli/gemini-md
+- OpenCode: https://opencode.ai/docs/commands, https://opencode.ai/docs/agents, https://opencode.ai/docs/skills, https://opencode.ai/docs/mcp-servers, https://opencode.ai/docs/permissions
 - Cursor: https://cursor.com/docs/rules, https://cursor.com/docs/subagents, https://cursor.com/docs/context/skills, https://cursor.com/docs/context/mcp, https://cursor.com/docs/cli/reference/permissions
 - Claude Code: https://code.claude.com/docs/en/settings, https://code.claude.com/docs/en/permissions

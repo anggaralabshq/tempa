@@ -8,5 +8,13 @@
       ],
       "type": "local"
     }
+  },
+  "permission": {
+    "edit": {
+      "*": "allow",
+      ".env*": "deny",
+      ".github/workflows/**": "deny",
+      "tempa.toml": "deny"
+    }
   }
 }

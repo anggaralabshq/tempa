@@ -39,7 +39,7 @@ pub struct Rendered {
 pub fn managed_dirs(agent: Agent) -> &'static [&'static str] {
     match agent {
         Agent::Claude => &[".claude/commands", ".claude/agents", ".claude/skills"],
-        Agent::Codex => &[".agents/skills"],
+        Agent::Codex => &[".codex/agents", ".agents/skills"],
         Agent::Gemini => &[".gemini/commands", ".gemini/agents", ".agents/skills"],
         Agent::Opencode => &[".opencode/commands", ".opencode/agents", ".agents/skills"],
         Agent::Cursor => &[".cursor/commands", ".cursor/agents", ".agents/skills"],
@@ -144,6 +144,30 @@ fn named_agent(a: &Item) -> String {
         pairs.push(("description", d));
     }
     with_header(Some(&front_of(&pairs)), &a.body)
+}
+
+/// opencode.ai/docs/permissions: `permission.edit` maps globs to allow/ask/deny, the last
+/// match wins, so `*` (the user's default) stays first. False when `permission` is not an
+/// object (a string applies to every tool; left as the user wrote it).
+fn opencode_deny(v: &mut Map<String, Value>, cfg: &Config) -> bool {
+    let perm = v.entry("permission").or_insert_with(|| json!({}));
+    let Some(perm) = perm.as_object_mut() else {
+        return false;
+    };
+    let mut edit = match perm.remove("edit") {
+        Some(Value::Object(m)) => m,
+        Some(Value::String(s)) => Map::from_iter([("*".to_string(), json!(s))]),
+        _ => Map::from_iter([("*".to_string(), json!("allow"))]),
+    };
+    // ponytail: serde_json sorts keys; `*` sorts before any glob starting with a letter, `.` or `/`.
+    for p in &cfg.gates.protected_paths {
+        edit.insert(
+            p.trim_start_matches("./").trim_start_matches('/').into(),
+            json!("deny"),
+        );
+    }
+    perm.insert("edit".into(), Value::Object(edit));
+    true
 }
 
 /// Append one deny rule per protected path to `v.permissions.deny`, keeping what is there.
@@ -489,8 +513,17 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
             for c in &src.commands {
                 o.gap("commands", &c.rel);
             }
+            // learn.chatgpt.com/docs/agent-configuration/subagents: one TOML file per agent.
             for a in &src.agents {
-                o.gap("agents", &a.rel);
+                let name = front_get(a, "name").unwrap_or_else(|| stem(&a.rel));
+                let mut t = header_toml() + "\n";
+                t += &format!("name = {}\n", toml_basic(name));
+                if let Some(d) = front_get(a, "description") {
+                    t += &format!("description = {}\n", toml_basic(d));
+                }
+                t += &format!("developer_instructions = {}\n", toml_multiline(&a.body));
+                let file = stem(&a.rel).replace('/', "-");
+                o.file(format!(".codex/agents/{file}.toml"), t);
             }
             skills(o, src, ".agents/skills");
             deny_gaps(o, cfg);
@@ -549,11 +582,14 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 );
             }
             skills(o, src, ".agents/skills");
-            deny_gaps(o, cfg);
 
             let path = "opencode.json";
-            if !src.mcp.is_empty() || src.bases.contains_key(path) {
+            let deny = !cfg.gates.protected_paths.is_empty();
+            if !src.mcp.is_empty() || src.bases.contains_key(path) || deny {
                 let mut v = base_json(src, path);
+                if deny && !opencode_deny(&mut v, cfg) {
+                    deny_gaps(o, cfg);
+                }
                 // OpenCode adds this key itself when it runs; render it so that is not drift.
                 v.entry("$schema")
                     .or_insert_with(|| json!("https://opencode.ai/config.json"));
@@ -596,8 +632,13 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                     with_header(None, &c.body),
                 );
             }
-            // Cursor also reads .claude/agents/ (cursor.com/docs/subagents): no duplicate.
-            if !cfg.agents.enabled.contains(&Agent::Claude) {
+            // Cursor also reads .claude/agents/ and .codex/agents/ (cursor.com/docs/subagents).
+            if !cfg
+                .agents
+                .enabled
+                .iter()
+                .any(|a| matches!(a, Agent::Claude | Agent::Codex))
+            {
                 for a in &src.agents {
                     o.file(format!(".cursor/agents/{}", a.rel), named_agent(a));
                 }

@@ -8,6 +8,8 @@
     ".cursor/mcp.json": "4809693514b746fa5b077c46b90a05e2ec07030f9fa6539fcc403c27cb963d3d",
     ".gemini/commands/review.toml": "2a2eee4acbe4535520168a2135c190fc36a3a836cbfe4a714dc7dba71f2e08f0",
     ".gemini/settings.json": "4e3ac96597057b21cfc27460b7fd9f5e4b390c5deb0ea3f56d6bc360c3fba711",
+    ".github/mcp.json": "746d9e127f61ced9a02c66a90804294dff82c4388b48326522aeb478d1f4c792",
+    ".github/skills/review/SKILL.md": "4bd60eed359fd98da1a4fc8cbbb990cc784101354e40972466edc8cb3b2d7bc4",
     ".mcp.json": "4809693514b746fa5b077c46b90a05e2ec07030f9fa6539fcc403c27cb963d3d",
     ".opencode/commands/review.md": "73f118f969275c2c785577730f7487eb5248eaace1c72367ef60001f9e2b1e23",
     "CLAUDE.md": "246825d497f0fde93d9e9398f1668d6ff8afba6e6bb3c5b8c755eb7f0adee68e",

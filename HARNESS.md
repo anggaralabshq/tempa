@@ -10,6 +10,6 @@
 ## Gates
 
 - Pre-commit: `tempa sync --fix` (sync from staged sources, block on drift).
-- Pre-push: `tempa check` (contract + harness: CLI format, lint, test; typecheck, Vitest, clippy and backend tests of the frozen `app/`). Needs Bun and the Tauri system dependencies.
+- Pre-push: `tempa check` (contract + harness: format, lint, test).
 - Task pull requests target the milestone branch and are gated by the hooks above.
-- CI runs once per milestone, on the pull request into `main`: `.github/workflows/app-windows.yml` runs the app backend tests on Windows when `app/` or `tempa-core` changed. The reviewer runs `tempa check --base main` on that branch before approving.
+- CI runs once per milestone, on the pull request into `main`: `.github/workflows/ci.yml` runs format, lint and tests on Linux, macOS and Windows, and the end-to-end script on Linux and macOS. Contract and task gates stay local, per task pull request.

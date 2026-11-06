@@ -38,11 +38,11 @@ fn pr_body_lists_only_decision_docs_reports_harness_and_keeps_heading_levels() {
     assert_eq!(
         top,
         [
-            "Ringkasan",
-            "Link plan",
-            "Decision terkait",
-            "Entri changes",
-            "Hasil harness",
+            "Summary",
+            "Plan",
+            "Decisions",
+            "Changes",
+            "Harness",
             "Review",
             "Agent + model"
         ]

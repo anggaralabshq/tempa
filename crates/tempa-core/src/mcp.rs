@@ -326,7 +326,10 @@ fn canonical(
     let mut out = Vec::new();
     let mut unknown = Vec::new();
     for (k, v) in map {
-        let Some(a) = allowed.iter().find(|a| a.eq_ignore_ascii_case(k.trim())) else {
+        let Some(a) = allowed
+            .iter()
+            .find(|a| crate::contract::same_name(a, k.trim()))
+        else {
             unknown.push(k.clone());
             continue;
         };

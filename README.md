@@ -24,8 +24,6 @@ cargo install tempa-cli --locked         # any platform with Rust 1.85+
 
 Or download a binary for macOS, Linux or Windows from [Releases](https://github.com/anggaralabshq/tempa/releases). tempa needs git on PATH. From a clone: `cargo install --path crates/tempa-cli --locked`.
 
-The Homebrew, crates.io and Releases installs are available from the first release (v0.1.0). Before that, install from a clone.
-
 ## Quick start
 
 An existing repo with agent files (`CLAUDE.md`, `.claude/`, `.cursorrules`, ...):

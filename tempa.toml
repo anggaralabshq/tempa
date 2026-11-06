@@ -11,7 +11,7 @@ changes   = "CHANGES.md"
 harness   = "HARNESS.md"
 
 [agents]
-enabled = ["claude", "codex", "gemini", "opencode", "cursor"]
+enabled = ["claude", "codex", "gemini", "opencode", "cursor", "copilot"]
 
 [harness]         # dijalankan berurutan; semua harus exit 0
 format = "cargo fmt --check"

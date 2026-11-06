@@ -175,6 +175,48 @@ pub fn sections(md: &str) -> Vec<Section> {
         .collect()
 }
 
+/// Replace the body under heading `title` (case-insensitive, outside code fences)
+/// up to the next heading of the same or higher level. `None` if absent.
+pub fn set_section(md: &str, title: &str, body: &str) -> Option<String> {
+    let text = normalize_eol(md);
+    let lines: Vec<&str> = text.lines().collect();
+    let mut fence: Option<&str> = None;
+    let mut heads = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        let t = line.trim_start();
+        if let Some(m) = ["```", "~~~"].into_iter().find(|m| t.starts_with(m)) {
+            match fence {
+                None => fence = Some(m),
+                Some(open) if open == m => fence = None,
+                Some(_) => {}
+            }
+            continue;
+        }
+        if fence.is_none() {
+            if let Some((level, t)) = heading(line) {
+                heads.push((i, level, t));
+            }
+        }
+    }
+    let n = heads
+        .iter()
+        .position(|(_, _, t)| t.eq_ignore_ascii_case(title))?;
+    let (start, level, _) = heads[n];
+    let end = heads[n + 1..]
+        .iter()
+        .find(|(_, l, _)| *l <= level)
+        .map(|(j, _, _)| *j)
+        .unwrap_or(lines.len());
+    let mut out: Vec<&str> = lines[..=start].to_vec();
+    out.push("");
+    out.extend(body.trim().lines());
+    if end < lines.len() {
+        out.push("");
+    }
+    out.extend(&lines[end..]);
+    Some(out.join("\n") + "\n")
+}
+
 /// Blocks of text separated by blank lines, each trimmed.
 pub fn paragraphs(md: &str) -> Vec<String> {
     let text = normalize_eol(md);
@@ -221,6 +263,19 @@ mod tests {
     fn front_strips_outer_quotes() {
         let (f, _) = split_front("---\ndescription: \"Halo: dunia\"\n---\n");
         assert_eq!(f.unwrap().pairs[0].1, "Halo: dunia");
+    }
+
+    #[test]
+    fn set_section_unit() {
+        let md = "---\nstate: plan\n---\n## Tujuan\n\n## Langkah\nlama\n### Sub\nx\n## Risiko\n";
+        let out = set_section(md, "langkah", "baru\nbaris dua").unwrap();
+        assert_eq!(
+            out,
+            "---\nstate: plan\n---\n## Tujuan\n\n## Langkah\n\nbaru\nbaris dua\n\n## Risiko\n"
+        );
+        let out = set_section(md, "Risiko", "rendah").unwrap();
+        assert!(out.ends_with("## Risiko\n\nrendah\n"), "{out}");
+        assert!(set_section(md, "Bonus", "x").is_none());
     }
 
     #[test]

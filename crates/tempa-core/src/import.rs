@@ -37,6 +37,31 @@ fn read(root: &Path, rel: &str) -> Option<String> {
     std::fs::read_to_string(root.join(rel)).ok().map(|s| normalize_eol(&s))
 }
 
+enum Include {
+    Text(String),
+    Missing,
+    Outside,
+}
+
+/// Read an `@include` only if it resolves (symlinks included) inside the repo.
+/// Personal files like `@~/.claude/notes.md` must never be copied into AGENTS.md.
+fn read_include(root: &Path, rel: &str) -> Include {
+    let p = Path::new(rel);
+    if rel.starts_with('~') || p.is_absolute() || p.components().any(|c| matches!(c, std::path::Component::ParentDir)) {
+        return Include::Outside;
+    }
+    let (Ok(base), Ok(full)) = (std::fs::canonicalize(root), std::fs::canonicalize(root.join(p))) else {
+        return Include::Missing;
+    };
+    if !full.starts_with(&base) {
+        return Include::Outside;
+    }
+    match std::fs::read_to_string(full) {
+        Ok(s) => Include::Text(normalize_eol(&s)),
+        Err(_) => Include::Missing,
+    }
+}
+
 /// Drop tempa's own header and `@<context>` lines; inline other `@path` lines.
 fn expand(root: &Path, text: &str, context: &str, gaps: &mut Vec<String>, from: &str) -> String {
     let mut out = String::new();
@@ -46,17 +71,17 @@ fn expand(root: &Path, text: &str, context: &str, gaps: &mut Vec<String>, from: 
             continue;
         }
         if let Some(path) = t.strip_prefix('@').filter(|p| !p.is_empty() && !p.contains(char::is_whitespace)) {
-            match read(root, path) {
-                Some(inc) => {
+            match read_include(root, path) {
+                Include::Text(inc) => {
                     out.push_str(inc.trim_end());
                     out.push('\n');
+                    continue;
                 }
-                None => {
-                    gaps.push(format!("{from}: @{path} tidak ditemukan, baris dibiarkan"));
-                    out.push_str(line);
-                    out.push('\n');
-                }
+                Include::Missing => gaps.push(format!("{from}: @{path} tidak ditemukan, baris dibiarkan")),
+                Include::Outside => gaps.push(format!("{from}: @{path} di luar repo, tidak di-inline")),
             }
+            out.push_str(line);
+            out.push('\n');
             continue;
         }
         out.push_str(line);

@@ -243,3 +243,10 @@
 - Decision: docs/decisions/2026-11-06-desktop-app-to-branch.md
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-fix-homebrew-checksums
+- Summary: Homebrew formula reads the uploaded .sha256 names and fails on bad checksums
+- Reason: Review: the first release would have pushed a formula with empty sha256 values
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

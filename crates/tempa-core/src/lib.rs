@@ -4,6 +4,7 @@ pub mod config;
 pub mod date;
 pub mod md;
 pub mod source;
+pub mod sync;
 pub mod targets;
 
 use std::fmt;

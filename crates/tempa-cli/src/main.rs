@@ -1,9 +1,98 @@
-use clap::Parser;
+use clap::{Parser, Subcommand};
+use std::path::Path;
+use std::process::{Command, ExitCode};
+use tempa_core::{Finding, Severity, sync};
 
 #[derive(Parser)]
 #[command(name = "tempa", version, about = "Satu kontrak konteks untuk semua coding agent")]
-struct Cli {}
+struct Cli {
+    #[command(subcommand)]
+    cmd: Option<Cmd>,
+}
 
-fn main() {
-    let _cli = Cli::parse();
+#[derive(Subcommand)]
+enum Cmd {
+    /// Generate file konteks tiap agent dari AGENTS.md dan .tempa/
+    Sync {
+        /// Hanya periksa drift, tidak menulis (untuk CI)
+        #[arg(long, conflicts_with = "fix")]
+        check: bool,
+        /// Untuk hook pre-commit: sync + git add bila aman, blokir bila target diedit langsung
+        #[arg(long)]
+        fix: bool,
+    },
+}
+
+/// Print findings; return whether any is an error.
+fn print_findings(findings: &[Finding]) -> bool {
+    let (mut e, mut w) = (0, 0);
+    for f in findings {
+        let level = match f.severity {
+            Severity::Error => {
+                e += 1;
+                "error"
+            }
+            Severity::Warning => {
+                w += 1;
+                "warning"
+            }
+        };
+        match &f.path {
+            Some(p) => println!("{level}[{}] {p}: {}", f.code, f.message),
+            None => println!("{level}[{}] {}", f.code, f.message),
+        }
+    }
+    println!("{e} error, {w} warning");
+    e > 0
+}
+
+fn git_add(root: &Path, paths: &[String]) -> tempa_core::Result<()> {
+    if paths.is_empty() {
+        return Ok(());
+    }
+    let out = Command::new("git").arg("-C").arg(root).args(["add", "-A", "--"]).args(paths).output()?;
+    if !out.status.success() {
+        return Err(tempa_core::Error(format!("git add gagal: {}", String::from_utf8_lossy(&out.stderr))));
+    }
+    Ok(())
+}
+
+fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
+    match cmd {
+        Cmd::Sync { check: true, .. } => Ok(print_findings(&sync::drift_findings(&sync::drift(root)?))),
+        Cmd::Sync { fix: true, .. } => {
+            let (changed, blockers) = sync::sync_fix(root)?;
+            if !blockers.is_empty() {
+                return Ok(print_findings(&sync::drift_findings(&blockers)));
+            }
+            git_add(root, &changed)?;
+            for p in &changed {
+                println!("synced {p}");
+            }
+            Ok(false)
+        }
+        Cmd::Sync { .. } => {
+            for p in sync::sync(root)? {
+                println!("synced {p}");
+            }
+            Ok(false)
+        }
+    }
+}
+
+fn main() -> ExitCode {
+    let cli = Cli::parse();
+    let Some(cmd) = cli.cmd else {
+        use clap::CommandFactory;
+        Cli::command().print_help().ok();
+        return ExitCode::from(2);
+    };
+    match run(cmd, Path::new(".")) {
+        Ok(false) => ExitCode::SUCCESS,
+        Ok(true) => ExitCode::from(1),
+        Err(e) => {
+            eprintln!("error: {e}");
+            ExitCode::from(2)
+        }
+    }
 }

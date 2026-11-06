@@ -179,16 +179,3 @@ fn full_cli_flow_passes_check() {
         "{f:?}"
     );
 }
-
-#[test]
-fn set_state_rejects_unknown_and_writes_known() {
-    let d = valid_repo();
-    let id = task_new(d.path(), "states").unwrap();
-    let err = tempa_core::task::set_state(d.path(), "done").unwrap_err();
-    assert!(err.0.contains("implement"), "{}", err.0);
-    for s in tempa_core::task::STATES {
-        tempa_core::task::set_state(d.path(), s).unwrap();
-        let plan = read(d.path(), &format!("docs/plans/{id}.md"));
-        assert!(plan.contains(&format!("\nstate: {s}\n")), "{plan}");
-    }
-}

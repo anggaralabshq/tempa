@@ -152,7 +152,7 @@ fn invalid_settings_json_is_clear_error() {
     let d = fixture_repo("claude-heavy");
     std::fs::write(d.path().join(".claude/settings.json"), "{").unwrap();
     let e = import(d.path(), true).unwrap_err();
-    assert!(e.0.contains("bukan JSON valid"), "{}", e.0);
+    assert!(e.0.contains("is not valid JSON"), "{}", e.0);
 }
 
 #[test]
@@ -188,7 +188,11 @@ fn includes_outside_repo_are_never_inlined() {
     let agents = read(d.path(), "AGENTS.md");
     assert!(!agents.contains("RAHASIA-PRIBADI"), "{agents}");
     assert!(
-        r.gaps.iter().filter(|g| g.contains("di luar repo")).count() >= 3,
+        r.gaps
+            .iter()
+            .filter(|g| g.contains("outside the repo"))
+            .count()
+            >= 3,
         "{:?}",
         r.gaps
     );

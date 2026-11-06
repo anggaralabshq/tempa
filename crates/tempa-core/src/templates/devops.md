@@ -1,8 +1,12 @@
-# Tempa — setup untuk DevOps (sekali saja)
+# Tempa: CI setup (one time)
 
-## 1. Step Bitbucket Pipelines
+Local git hooks already run `tempa sync --fix` (pre-commit) and `tempa check` (pre-push). Hooks can be skipped with `--no-verify`, so enforce the contract in CI once you are ready.
 
-Tambahkan ke `bitbucket-pipelines.yml`:
+## 1. CI step
+
+The step only checks drift and the contract documents. It needs no secrets and runs no tests; keep lint/test in your existing steps. It needs the full git history (`tempa check` diffs against the base branch).
+
+Bitbucket Pipelines:
 
 ```yaml
 pipelines:
@@ -17,16 +21,30 @@ pipelines:
             - tempa check --contract-only
 ```
 
-Step ini hanya memeriksa drift dan kontrak dokumen, tanpa secret dan tanpa menjalankan test. Lint/test tetap di step yang sudah ada.
+GitHub Actions:
 
-`<registry>` diisi setelah lokasi hosting image diputuskan. Versi image harus sama dengan `tempa_version` di `tempa.toml`.
+```yaml
+on: pull_request
+jobs:
+  tempa:
+    runs-on: ubuntu-latest
+    container: <registry>/tempa:{version}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - run: tempa check --contract-only --base "origin/${{ github.base_ref }}"
+```
 
-## 2. Merge check (Repository settings → Branch restrictions → branch tujuan)
+Set `<registry>` once the image hosting is decided. The image version must match `tempa_version` in `tempa.toml`.
 
-- Minimum successful builds: 1
-- Minimum approvals: 1
-- Centang "Prevent a merge with unresolved merge checks" (Premium)
+## 2. Merge rules
 
-## 3. Jangan
+- Require the tempa step to pass (Bitbucket: Minimum successful builds 1; GitHub: required status check).
+- Require at least one approval.
+- Bitbucket Premium: tick "Prevent a merge with unresolved merge checks".
 
-- Jangan menerima build status dari mesin developer sebagai pengganti step ini.
+## 3. Don't
+
+- Don't accept a build status reported from a developer machine in place of this step.

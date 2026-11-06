@@ -29,7 +29,7 @@ fn check_slug(slug: &str) -> Result<()> {
         Ok(())
     } else {
         Err(Error(format!(
-            "slug \"{slug}\" tidak valid: pakai huruf kecil, angka, dan tanda hubung, contoh add-invoice"
+            "invalid slug \"{slug}\": use lowercase letters, digits and hyphens, e.g. add-invoice"
         )))
     }
 }
@@ -43,12 +43,12 @@ pub fn task_new(root: &Path, slug: &str) -> Result<String> {
     check_slug(slug)?;
     let cfg = Config::load(root)?;
     if !gitx::is_repo(root) {
-        return Err(Error("bukan repo git; jalankan `git init` dulu".into()));
+        return Err(Error("not a git repository; run `git init` first".into()));
     }
     let id = format!("{}-{slug}", compact_today());
     let path = plan_path(&cfg, &id);
     if root.join(&path).exists() {
-        return Err(Error(format!("{path} sudah ada")));
+        return Err(Error(format!("{path} already exists")));
     }
     gitx::switch_new(root, &format!("tempa/{id}"))?;
     write_atomic(&root.join(&path), PLAN.replace("{id}", &id).as_bytes())?;
@@ -60,18 +60,14 @@ pub fn current_task_id(root: &Path) -> Result<String> {
     branch
         .strip_prefix("tempa/")
         .map(String::from)
-        .ok_or_else(|| {
-            Error(format!(
-                "{branch} bukan branch task; gunakan tempa task new"
-            ))
-        })
+        .ok_or_else(|| Error(format!("{branch} is not a task branch; use tempa task new")))
 }
 
 pub fn task_approve(root: &Path) -> Result<()> {
     let cfg = Config::load(root)?;
     let path = plan_path(&cfg, &current_task_id(root)?);
     let text = std::fs::read_to_string(root.join(&path))
-        .map_err(|_| Error(format!("{path} tidak ditemukan")))?;
+        .map_err(|_| Error(format!("{path} not found")))?;
     let text = set_front(&text, "state", "approved");
     let text = set_front(&text, "approved_by", &gitx::user_name(root)?);
     let text = set_front(&text, "approved_at", &iso_today());
@@ -84,7 +80,7 @@ pub fn decide(root: &Path, slug: &str) -> Result<String> {
     let cfg = Config::load(root)?;
     let path = format!("{}{}-{slug}.md", dir(&cfg.docs.decisions), iso_today());
     if root.join(&path).exists() {
-        return Err(Error(format!("{path} sudah ada")));
+        return Err(Error(format!("{path} already exists")));
     }
     write_atomic(&root.join(&path), DECISION.as_bytes())?;
     Ok(path)
@@ -95,14 +91,14 @@ pub struct LogEntry {
     pub summary: String,
     pub reason: String,
     pub decision: Option<String>,
-    /// `lulus` | `gagal` | `belum`
+    /// `pass` | `fail` | `pending`
     pub harness: String,
     pub agent: String,
 }
 
 fn one_line(name: &str, v: &str) -> Result<()> {
     if v.trim().is_empty() || v.contains('\n') {
-        return Err(Error(format!("{name} wajib diisi, satu baris")));
+        return Err(Error(format!("{name} is required, on one line")));
     }
     Ok(())
 }
@@ -120,12 +116,17 @@ pub fn log(root: &Path, e: &LogEntry) -> Result<()> {
     one_line("--summary", &e.summary)?;
     one_line("--reason", &e.reason)?;
     one_line("--agent", &e.agent)?;
-    if !["lulus", "gagal", "belum"].contains(&e.harness.as_str()) {
-        return Err(Error(format!(
-            "--harness harus lulus, gagal, atau belum (bukan \"{}\")",
-            e.harness
-        )));
-    }
+    // Indonesian values from tempa 0.1 are accepted and normalized.
+    let harness = match e.harness.as_str() {
+        "pass" | "lulus" => "pass",
+        "fail" | "gagal" => "fail",
+        "pending" | "belum" => "pending",
+        other => {
+            return Err(Error(format!(
+                "--harness must be pass, fail or pending (got \"{other}\")"
+            )));
+        }
+    };
     let decision = e.decision.clone().unwrap_or_else(|| "-".into());
     one_line("--decision", &decision)?;
     let cfg = Config::load(root)?;
@@ -134,7 +135,7 @@ pub fn log(root: &Path, e: &LogEntry) -> Result<()> {
         task_id: current_task_id(root)?,
         fields: CHANGE_FIELDS
             .iter()
-            .zip([&e.summary, &e.reason, &decision, &e.harness, &e.agent])
+            .zip([e.summary.as_str(), &e.reason, &decision, harness, &e.agent])
             .map(|(k, v)| (k.to_string(), v.trim().to_string()))
             .collect(),
     };
@@ -195,7 +196,7 @@ pub fn pr_body(root: &Path) -> Result<String> {
     };
     let agent = field("Agent");
     let harness = format!(
-        "{} (dicatat lewat `tempa log`). Verifikasi ulang: `tempa check --base {}`",
+        "{} (recorded with `tempa log`). Re-verify: `tempa check --base {}`",
         field("Harness"),
         cfg.ci.base
     );

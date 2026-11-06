@@ -95,13 +95,20 @@ fn warn_hooks_path(root: &Path) {
 }
 
 fn print_doctor(r: &doctor::DoctorReport) {
+    let w = r
+        .rows
+        .iter()
+        .map(|row| row.protected.len())
+        .chain(["protected".len()])
+        .max()
+        .unwrap_or(0);
     println!(
-        "{:<10} {:>5} {:>5}  {:<14} lifecycle",
+        "{:<10} {:>5} {:>5}  {:<w$}  lifecycle",
         "agent", "files", "gaps", "protected"
     );
     for row in &r.rows {
         println!(
-            "{:<10} {:>5} {:>5}  {:<14} {}",
+            "{:<10} {:>5} {:>5}  {:<w$}  {}",
             row.agent.name(),
             row.files,
             row.gaps.len(),

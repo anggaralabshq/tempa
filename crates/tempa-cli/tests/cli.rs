@@ -255,6 +255,15 @@ fn doctor_prints_table_and_exits_0_even_with_drift() {
     );
     assert!(out.contains("run tempa init"), "{out}");
     assert!(out.contains("drift: 1"), "{out}");
+    // Columns line up whatever the longest protected value is.
+    let col = out.lines().next().unwrap().find("lifecycle").unwrap();
+    for row in out.lines().skip(1).take_while(|l| !l.starts_with('-')) {
+        assert_eq!(
+            row.len() - row.split_whitespace().last().unwrap().len(),
+            col,
+            "{out}"
+        );
+    }
 }
 
 #[test]

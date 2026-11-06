@@ -1,5 +1,6 @@
 // Fake ACP agent for tests: newline-delimited JSON-RPC on stdio.
-// Prompts: "echo <x>", "mcp", "edit <path>", "hang", "crash", "spawn-child".
+// Prompts (last line of the prompt): "echo <x>", "mcp", "edit <path>", "run <cmd>", "hang",
+// "crash", "spawn-child", "first" (says the whole prompt).
 // Env: FAKE_SILENT=1 never answers; FAKE_AUTH=1 fails session/new with auth_required.
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -55,7 +56,7 @@ rl.on("line", async (line) => {
 
 async function prompt(m) {
   const text = m.params.prompt.map((b) => b.text).join("");
-  const [cmd, ...rest] = text.split(" ");
+  const [cmd, ...rest] = text.split("\n").at(-1).split(" ");
   const arg = rest.join(" ");
   const end = (stopReason = "end_turn") => send({ id: m.id, result: { stopReason } });
   switch (cmd) {
@@ -66,10 +67,16 @@ async function prompt(m) {
     case "mcp":
       say(JSON.stringify(mcpServers));
       return end();
+    case "first":
+      say(text);
+      return end();
+    case "run":
     case "edit": {
       const r = await ask("session/request_permission", {
         sessionId: "s1",
-        toolCall: { toolCallId: "t1", title: `edit ${arg}`, kind: "edit", locations: [{ path: arg }] },
+        toolCall: cmd === "run"
+          ? { toolCallId: "t1", title: arg, kind: "execute" }
+          : { toolCallId: "t1", title: `edit ${arg}`, kind: "edit", locations: [{ path: arg }] },
         options: [
           { optionId: "a1", name: "Allow", kind: "allow_once" },
           { optionId: "a2", name: "Always", kind: "allow_always" },

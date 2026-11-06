@@ -218,6 +218,7 @@ async fn chat_start(
         args: &args,
         cwd: std::path::Path::new(&cwd),
         path_env: path.as_deref(),
+        task: task.as_deref(),
     };
     chats.start_with(run, mcp, Some(transcript), emit)
 }

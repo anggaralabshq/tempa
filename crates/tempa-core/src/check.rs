@@ -52,6 +52,12 @@ fn globs(patterns: &[String]) -> Result<GlobSet> {
     b.build().map_err(|e| Error(e.to_string()))
 }
 
+/// `rel` (repo-relative, `/`-separated) matches `[gates].protected_paths`.
+/// An invalid glob counts as a match: the agent host fails closed.
+pub fn is_protected(cfg: &Config, rel: &str) -> bool {
+    globs(&cfg.gates.protected_paths).map_or(true, |g| g.is_match(rel))
+}
+
 fn dir(d: &str) -> String {
     format!("{}/", d.trim_end_matches('/'))
 }

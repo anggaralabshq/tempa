@@ -2,13 +2,14 @@
 //! `emit`, permission requests waiting on the user's answer.
 
 use super::conn::{Conn, Handlers};
+use super::policy::{self, Phase, Verdict};
 use super::session::{McpLaunch, Session};
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::HashMap;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 
@@ -20,6 +21,9 @@ struct Chat {
     waiting: Waiting,
     emit: Emit,
     log: Log,
+    cwd: PathBuf,
+    task: Option<String>,
+    first: AtomicBool,
 }
 
 /// Append-only JSONL transcript of a chat (None = not recorded).
@@ -31,12 +35,20 @@ impl Log {
         let Some(path) = path else {
             return Ok(Log(None));
         };
-        if let Some(dir) = path.parent() {
-            std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        // Transcripts hold code and command output: owner-only on Unix.
+        let mut dir = std::fs::DirBuilder::new();
+        let mut file = std::fs::OpenOptions::new();
+        file.create(true).append(true);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt};
+            dir.mode(0o700);
+            file.mode(0o600);
         }
-        let f = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
+        if let Some(d) = path.parent() {
+            dir.recursive(true).create(d).map_err(|e| e.to_string())?;
+        }
+        let f = file
             .open(&path)
             .map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(Log(Some(Arc::new(Mutex::new(f)))))
@@ -45,7 +57,8 @@ impl Log {
     fn write(&self, v: &Value) {
         if let Some(f) = &self.0 {
             let mut f = f.lock().unwrap_or_else(|p| p.into_inner());
-            let _ = writeln!(f, "{v}");
+            // One write per line: a reader never sees half an event.
+            let _ = f.write_all(format!("{v}\n").as_bytes());
         }
     }
 }
@@ -70,6 +83,33 @@ pub struct Run<'a> {
     pub args: &'a [String],
     pub cwd: &'a Path,
     pub path_env: Option<&'a str>,
+    /// The task this chat works on (its worktree is `cwd`); None = Explore.
+    pub task: Option<&'a str>,
+}
+
+/// The host's verdict on a permission request, from the phase on disk now (RF-4).
+fn verdict(cwd: &Path, explore: bool, call: &Value) -> Verdict {
+    let Ok(cfg) = tempa_core::config::Config::load(cwd) else {
+        return Verdict::Ask;
+    };
+    let phase = if explore {
+        Phase::Explore
+    } else {
+        policy::phase(crate::verify::current_state(cwd).as_deref())
+    };
+    let paths: Vec<String> = call["locations"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|l| l["path"].as_str().map(String::from))
+        .collect();
+    policy::decide(
+        phase,
+        call["kind"].as_str().unwrap_or("other"),
+        &paths,
+        cwd,
+        &cfg,
+    )
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -113,6 +153,7 @@ impl ChatManager {
             args,
             cwd,
             path_env,
+            task,
         } = run;
         let log = Log::open(transcript)?;
         let (raw, l) = (emit, log.clone());
@@ -124,6 +165,7 @@ impl ChatManager {
         let next_req = Arc::new(AtomicU64::new(1));
         let (on_update, on_ask, on_exit) = (emit.clone(), emit.clone(), emit.clone());
         let w = Arc::clone(&waiting);
+        let (scope, explore) = (cwd.to_path_buf(), task.is_none());
         let handlers = Handlers {
             notify: Box::new(move |method: &str, p: Value| {
                 if method == "session/update" {
@@ -135,6 +177,26 @@ impl ChatManager {
                     return Err(
                         json!({"code": -32601, "message": format!("{method} is not supported by tempa")}),
                     );
+                }
+                let v = verdict(&scope, explore, &p["toolCall"]);
+                let options = p["options"].as_array().cloned().unwrap_or_default();
+                let auto = match &v {
+                    Verdict::Deny(reason) => {
+                        Some(("rejected", reason.clone(), policy::pick(&options, &v)))
+                    }
+                    Verdict::Allow => {
+                        policy::pick(&options, &v).map(|o| ("allowed", String::new(), Some(o)))
+                    }
+                    Verdict::Ask => None,
+                };
+                if let Some((verdict, reason, option)) = auto {
+                    on_ask(
+                        json!({"type": "auto", "verdict": verdict, "reason": reason, "toolCall": p["toolCall"]}),
+                    );
+                    return Ok(match option {
+                        Some(o) => json!({"outcome": {"outcome": "selected", "optionId": o}}),
+                        None => json!({"outcome": {"outcome": "cancelled"}}),
+                    });
                 }
                 let request = next_req.fetch_add(1, Ordering::Relaxed);
                 let (tx, rx) = mpsc::channel();
@@ -165,6 +227,9 @@ impl ChatManager {
             waiting,
             emit,
             log,
+            cwd: cwd.to_path_buf(),
+            task: task.map(String::from),
+            first: AtomicBool::new(true),
         });
         self.chats
             .lock()
@@ -177,7 +242,20 @@ impl ChatManager {
     pub fn prompt(&self, id: u32, text: &str) -> Result<(), String> {
         let chat = self.get(id)?;
         chat.log.write(&json!({"type": "user", "text": text}));
-        let text = text.to_string();
+        let mut text = text.to_string();
+        if chat.first.swap(false, Ordering::Relaxed) {
+            let mut state = crate::verify::current_state(&chat.cwd);
+            if state.as_deref() == Some("approved")
+                && tempa_core::task::set_state(&chat.cwd, "implement").is_ok()
+            {
+                state = Some("implement".into());
+            }
+            let task = chat
+                .task
+                .as_deref()
+                .map(|t| (t, state.as_deref().unwrap_or("plan")));
+            text = policy::preamble(task) + &text;
+        }
         std::thread::spawn(move || {
             let ev = match chat.session.prompt(&text) {
                 Ok(reason) => json!({"type": "turn_end", "stopReason": reason}),

@@ -264,6 +264,7 @@ fn cancel_answers_pending_permission_cancelled() {
                 args: &fake_args(),
                 cwd: Path::new(env!("CARGO_MANIFEST_DIR")),
                 path_env: None,
+                task: None,
             },
             mcp(),
             None,
@@ -299,6 +300,7 @@ fn transcript_records_prompts_and_events() {
                 args: &fake_args(),
                 cwd: Path::new(env!("CARGO_MANIFEST_DIR")),
                 path_env: None,
+                task: None,
             },
             mcp(),
             Some(file.clone()),
@@ -310,6 +312,17 @@ fn transcript_records_prompts_and_events() {
     m.prompt(started.id, "echo hi").unwrap();
     assert!(rx.iter().any(|e| e["type"] == "turn_end"));
     m.stop_all();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        assert_eq!(
+            mode(&file),
+            0o600,
+            "transcripts hold code and output: owner only"
+        );
+        assert_eq!(mode(file.parent().unwrap()), 0o700);
+    }
     let lines: Vec<Value> = std::fs::read_to_string(&file)
         .unwrap()
         .lines()
@@ -320,6 +333,108 @@ fn transcript_records_prompts_and_events() {
         lines
             .iter()
             .any(|e| e["update"]["content"]["text"] == "echo hi")
+            || lines.iter().any(|e| e["update"]["content"]["text"]
+                .as_str()
+                .is_some_and(|t| t.ends_with("echo hi")))
     );
     assert!(lines.iter().any(|e| e["type"] == "turn_end"));
+}
+
+type Events = mpsc::Receiver<Value>;
+
+fn chat(cwd: &Path, task: Option<&str>) -> (super::chat::ChatManager, u32, Events) {
+    let (tx, rx) = mpsc::channel::<Value>();
+    let m = super::chat::ChatManager::default();
+    let id = m
+        .start_with(
+            super::chat::Run {
+                program: &node(),
+                args: &fake_args(),
+                cwd,
+                path_env: None,
+                task,
+            },
+            mcp(),
+            None,
+            std::sync::Arc::new(move |e: Value| {
+                let _ = tx.send(e);
+            }),
+        )
+        .unwrap()
+        .id;
+    (m, id, rx)
+}
+
+/// Text the agent said in the next turn.
+fn said(rx: &Events) -> String {
+    let mut out = String::new();
+    for e in rx.iter() {
+        if let Some(t) = e["update"]["content"]["text"].as_str() {
+            out.push_str(t);
+        }
+        if e["type"] == "turn_end" || e["type"] == "error" {
+            return out;
+        }
+    }
+    out
+}
+
+#[test]
+fn edit_before_approval_is_rejected_then_allowed_after_approve() {
+    let (d, id) = crate::verify::tests::task_repo("exit 0", "plan");
+    let (m, chat, rx) = chat(d.path(), Some(&id));
+    m.prompt(chat, "edit src/a.ts").unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&said(&rx)).unwrap(),
+        json!({"outcome": "selected", "optionId": "r1"})
+    );
+    // Same session: the phase is read again on the next request.
+    tempa_core::task::set_state(d.path(), "approved").unwrap();
+    m.prompt(chat, "edit src/a.ts").unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&said(&rx)).unwrap(),
+        json!({"outcome": "selected", "optionId": "a1"})
+    );
+    m.prompt(chat, "edit .env").unwrap();
+    assert_eq!(
+        serde_json::from_str::<Value>(&said(&rx)).unwrap(),
+        json!({"outcome": "selected", "optionId": "r1"})
+    );
+    m.stop_all();
+}
+
+#[test]
+fn first_prompt_carries_preamble_and_starts_implement() {
+    let (d, id) = crate::verify::tests::task_repo("exit 0", "approved");
+    let (m, chat, rx) = chat(d.path(), Some(&id));
+    m.prompt(chat, "first").unwrap();
+    let text = said(&rx);
+    assert!(text.contains(&id) && text.contains("tempa_check"), "{text}");
+    assert_eq!(
+        crate::verify::current_state(d.path()).as_deref(),
+        Some("implement")
+    );
+    m.prompt(chat, "first").unwrap();
+    assert_eq!(said(&rx), "first");
+    m.stop_all();
+}
+
+#[test]
+fn pending_permission_is_cancelled_on_stop() {
+    let (m, chat, rx) = chat(Path::new(env!("CARGO_MANIFEST_DIR")), None);
+    m.prompt(chat, "run ls").unwrap();
+    assert!(rx.iter().any(|e| e["type"] == "permission"));
+    // Not stuck in the permission handler: stop returns and the exit is reported.
+    let (done, stopped) = mpsc::channel();
+    std::thread::spawn(move || {
+        m.stop(chat);
+        let _ = done.send(());
+    });
+    assert!(
+        stopped.recv_timeout(Duration::from_secs(10)).is_ok(),
+        "stop hung on a pending permission"
+    );
+    let exited = std::iter::from_fn(|| rx.recv_timeout(Duration::from_secs(5)).ok())
+        .any(|e| e["type"] == "exit" || e["type"] == "error");
+    assert!(exited);
 }

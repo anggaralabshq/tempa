@@ -11,6 +11,7 @@ vi.mock("@tauri-apps/api/core", () => ({
   Channel: class {},
 }));
 vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn() }));
+vi.mock("./contract/ContractPanel", () => ({ default: () => <h2>Contract</h2> }));
 // xterm needs a real canvas; terminals are exercised in the running app.
 vi.mock("./layout/Workspace", () => ({
   default: ({ cwd, active }: { cwd: string; active: boolean }) => <div data-testid={`ws:${cwd}`} data-active={active} />,

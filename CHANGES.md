@@ -76,3 +76,10 @@
 - Decision: docs/decisions/2026-11-06-folder-picker-dialog-plugin.md
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-app-contract-panel
+- Ringkasan: Contract panel: findings, drift actions, agents, hooks, CLI version
+- Alasan: M2: keep the contract visible and fixable without the CLI
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

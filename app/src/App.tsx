@@ -1,5 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
+import ContractPanel from "./contract/ContractPanel";
 import Workspace from "./layout/Workspace";
 import { type Project, projectsAdd, projectsList, projectsRemove } from "./lib/ipc";
 import Sidebar from "./sidebar/Sidebar";
@@ -55,8 +56,8 @@ export default function App() {
           </div>
         ))}
       </main>
-      <aside aria-label="Contract" className="w-72 shrink-0 border-l border-white/10 p-3">
-        <h2 className="mb-2 text-xs uppercase tracking-wide text-white/50">Contract</h2>
+      <aside aria-label="Contract" className="w-72 shrink-0 overflow-auto border-l border-white/10 p-3">
+        <ContractPanel root={projects.find((p) => p.id === active)?.path ?? null} />
       </aside>
     </div>
   );

@@ -118,10 +118,14 @@ fn removed_source_removes_output() {
 fn fix_applies_stale_but_blocks_direct_edit() {
     let d = canon_repo();
     sync(d.path()).unwrap();
-    write(d.path(), "AGENTS.md", "# A v2\n");
+    write(
+        d.path(),
+        ".tempa/commands/review.md",
+        "---\ndescription: R\n---\nreview v2\n",
+    );
     let (changed, blockers) = sync_fix(d.path()).unwrap();
     assert!(
-        changed.contains(&".cursor/rules/tempa.mdc".to_string()),
+        changed.contains(&".claude/commands/review.md".to_string()),
         "{changed:?}"
     );
     assert!(blockers.is_empty());

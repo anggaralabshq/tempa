@@ -114,20 +114,21 @@ fn sync_fix_reports_lock_as_changed() {
 #[test]
 fn sync_fix_blocks_unstaged_source_changes() {
     let d = valid_repo();
-    write(
-        d.path(),
-        "AGENTS.md",
-        &format!("{}\nSECRET WIP NOTE\n", common::VALID_AGENTS),
-    );
+    let cmd = ".tempa/commands/review.md";
+    write(d.path(), cmd, "Review.\n");
+    tempa_core::sync::sync(d.path()).unwrap();
+    git(d.path(), &["add", "-A"]);
+    git(d.path(), &["commit", "-qm", "command", "--no-verify"]);
+    write(d.path(), cmd, "Review.\nSECRET WIP NOTE\n");
     let (changed, blockers) = sync_fix(d.path()).unwrap();
     assert!(changed.is_empty());
     assert!(
         blockers
             .iter()
-            .any(|f| f.code == "sync.unstaged_source" && f.path.as_deref() == Some("AGENTS.md")),
+            .any(|f| f.code == "sync.unstaged_source" && f.path.as_deref() == Some(cmd)),
         "{blockers:?}"
     );
-    assert!(!read(d.path(), ".cursor/rules/tempa.mdc").contains("SECRET WIP NOTE"));
+    assert!(!read(d.path(), ".claude/commands/review.md").contains("SECRET WIP NOTE"));
 }
 
 #[test]

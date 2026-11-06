@@ -117,3 +117,10 @@
 - Decision: docs/decisions/2026-11-06-acp-client-on-serde-json.md
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-fix-hookless-test-repos
+- Ringkasan: Test repos commit without hooks, so app tests pass without the tempa CLI (Windows CI)
+- Alasan: PR #16 and #17 were merged with red Windows CI
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

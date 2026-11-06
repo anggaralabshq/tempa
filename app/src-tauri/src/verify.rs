@@ -108,7 +108,8 @@ pub(crate) mod tests {
         tempa_core::init::init(d.path()).unwrap();
         tempa_core::config::add_harness(d.path(), "ok", cmd).unwrap();
         git(d.path(), &["add", "-A"]);
-        git(d.path(), &["commit", "-qm", "init"]);
+        // No hooks: the test repo must not need the tempa CLI installed (CI has none).
+        git(d.path(), &["commit", "-qm", "init", "--no-verify"]);
         let id = tempa_core::task::task_new(d.path(), "x").unwrap();
         tempa_core::task::set_state(d.path(), state).unwrap();
         (d, id)

@@ -121,7 +121,7 @@ pub fn sync_force(root: &Path) -> Result<Vec<String>> {
 }
 
 /// Target dirs `tempa import` can absorb new files from: (dir, `.tempa/<kind>`).
-pub const ITEM_DIRS: [(&str, &str); 8] = [
+pub const ITEM_DIRS: [(&str, &str); 9] = [
     (".claude/commands", "commands"),
     (".claude/agents", "agents"),
     (".claude/skills", "skills"),
@@ -129,14 +129,16 @@ pub const ITEM_DIRS: [(&str, &str); 8] = [
     (".opencode/commands", "commands"),
     (".opencode/agents", "agents"),
     (".cursor/commands", "commands"),
+    (".cursor/agents", "agents"),
     (".gemini/agents", "agents"),
 ];
 
 /// Shared config targets whose non-tempa keys `tempa import` keeps as a base.
-pub const CONFIG_FILES: [&str; 6] = [
+pub const CONFIG_FILES: [&str; 7] = [
     ".claude/settings.json",
     ".mcp.json",
     ".cursor/mcp.json",
+    ".cursor/cli.json",
     ".gemini/settings.json",
     "opencode.json",
     ".codex/config.toml",
@@ -144,10 +146,7 @@ pub const CONFIG_FILES: [&str; 6] = [
 
 /// Direct edits to this target can be absorbed by `tempa import`.
 pub fn absorbs_edit(path: &str) -> bool {
-    path == "CLAUDE.md"
-        || path == ".cursor/rules/tempa.mdc"
-        || path.starts_with(".claude/")
-        || CONFIG_FILES.contains(&path)
+    path == "CLAUDE.md" || path.starts_with(".claude/") || CONFIG_FILES.contains(&path)
 }
 
 /// A new file at this path can be absorbed by `tempa import`.

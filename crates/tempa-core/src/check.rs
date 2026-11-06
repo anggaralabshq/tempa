@@ -32,7 +32,7 @@ const MANIFESTS: [&str; 10] = [
 fn globs(patterns: &[String]) -> Result<GlobSet> {
     let mut b = GlobSetBuilder::new();
     for p in patterns {
-        b.add(Glob::new(p).map_err(|e| Error(format!("glob tidak valid {p}: {e}")))?);
+        b.add(Glob::new(p).map_err(|e| Error(format!("invalid glob {p}: {e}")))?);
     }
     b.build().map_err(|e| Error(e.to_string()))
 }
@@ -51,7 +51,7 @@ pub fn check(root: &Path, opts: &CheckOpts) -> Result<Vec<Finding>> {
                 "version.mismatch",
                 Some(crate::config::FILE.into()),
                 format!(
-                    "tempa.toml mengunci versi {v}, binary ini {}",
+                    "tempa.toml pins version {v}, this binary is {}",
                     env!("CARGO_PKG_VERSION")
                 ),
             ));
@@ -64,7 +64,7 @@ pub fn check(root: &Path, opts: &CheckOpts) -> Result<Vec<Finding>> {
     let base = gitx::resolve_base(root, &cfg, opts.base.as_deref());
     if base.is_none() {
         let msg = format!(
-            "branch dasar {base_name} tidak ditemukan atau riwayat tidak cukup; aturan task dilewati. \
+            "base branch {base_name} not found or history too shallow; task rules skipped. \
              Di Bitbucket Pipelines pakai `clone: depth: full`"
         );
         f.push(
@@ -102,7 +102,7 @@ pub fn check(root: &Path, opts: &CheckOpts) -> Result<Vec<Finding>> {
             f.push(Finding::warning(
                 "harness.empty",
                 Some(crate::config::FILE.into()),
-                "[harness] kosong — tidak ada lint/test yang dijalankan; isi perintahnya di tempa.toml",
+                "[harness] is empty, so no lint/test runs; add commands in tempa.toml",
             ));
         }
         f.extend(run_harness(root, &cfg)?);
@@ -123,7 +123,7 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
             f.push(Finding::error(
                 "task.no_plan",
                 Some(plan),
-                format!("branch {branch} belum punya file plan"),
+                format!("branch {branch} has no plan file"),
             ));
         }
         Some(id.to_string())
@@ -137,7 +137,7 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
                 f.push(Finding::error(
                     "task.no_plan",
                     None,
-                    format!("PR ini tidak menambah/mengubah plan di {plan_dir}"),
+                    format!("this PR adds or changes no plan in {plan_dir}"),
                 ));
                 None
             }
@@ -151,7 +151,7 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
                 f.push(Finding::error(
                     "task.multiple_plans",
                     None,
-                    format!("satu PR satu task; plan berubah: {list}"),
+                    format!("one PR, one task; plans changed: {list}"),
                 ));
                 None
             }
@@ -164,7 +164,7 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
             f.push(Finding::error(
                 "task.no_change_entry",
                 Some(cfg.docs.changes.clone()),
-                format!("belum ada entri changes untuk task {id}; jalankan tempa log"),
+                format!("no changes entry for task {id}; run tempa log"),
             ));
         }
     }
@@ -195,7 +195,7 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
                 "task.decision_required",
                 None,
                 format!(
-                    "perubahan memicu {}; tambahkan decision baru (tempa decide)",
+                    "changes trigger {}; add a new decision (tempa decide)",
                     triggers.join(", ")
                 ),
             ));
@@ -210,7 +210,7 @@ pub fn task_findings(root: &Path, cfg: &Config, base: &str) -> Result<Vec<Findin
             "task.diff_too_large",
             None,
             format!(
-                "diff {lines} baris melebihi max_diff_lines {}; pecah task",
+                "diff of {lines} lines exceeds max_diff_lines {}; split the task",
                 g.max_diff_lines
             ),
         ));
@@ -224,7 +224,7 @@ pub fn run_harness(root: &Path, cfg: &Config) -> Result<Vec<Finding>> {
         let out = shell(cmd)
             .current_dir(root)
             .output()
-            .map_err(|e| Error(format!("harness {name} tidak bisa dijalankan: {e}")))?;
+            .map_err(|e| Error(format!("harness {name} could not run: {e}")))?;
         if !out.status.success() {
             let code = out
                 .status
@@ -238,7 +238,7 @@ pub fn run_harness(root: &Path, cfg: &Config) -> Result<Vec<Finding>> {
             return Ok(vec![Finding::error(
                 "harness.failed",
                 Some(name.clone()),
-                format!("`{cmd}` gagal (exit {code}); 20 baris terakhir:\n{tail}"),
+                format!("`{cmd}` failed (exit {code}); last 20 lines:\n{tail}"),
             )]);
         }
     }

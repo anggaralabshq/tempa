@@ -13,7 +13,7 @@ fn git(root: &Path, args: &[&str]) -> Result<String> {
         .args(["-c", "core.quotepath=false"])
         .args(args)
         .output()
-        .map_err(|e| Error(format!("git tidak bisa dijalankan: {e}")))?;
+        .map_err(|e| Error(format!("could not run git: {e}")))?;
     if !out.status.success() {
         return Err(Error(format!(
             "git {}: {}",

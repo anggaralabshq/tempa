@@ -60,13 +60,13 @@ fn headings(findings: &mut Vec<Finding>, path: &str, md: &str, required: &[Strin
             Finding::error(
                 "contract.missing_heading",
                 Some(path.into()),
-                format!("heading wajib \"{h}\" tidak ada"),
+                format!("required heading \"{h}\" is missing"),
             )
         } else {
             Finding::error(
                 "contract.empty_heading",
                 Some(path.into()),
-                format!("heading \"{h}\" masih kosong"),
+                format!("heading \"{h}\" is empty"),
             )
         });
     }
@@ -79,7 +79,7 @@ fn doc(root: &Path, findings: &mut Vec<Finding>, path: &str) -> Option<String> {
             findings.push(Finding::error(
                 "contract.missing_doc",
                 Some(path.into()),
-                "dokumen kontrak belum ada; jalankan tempa init",
+                "contract document missing; run tempa init",
             ));
             None
         }
@@ -117,7 +117,7 @@ pub fn check_docs(root: &Path, cfg: &Config) -> Result<Vec<Finding>> {
             f.push(Finding::error(
                 "contract.plan_frontmatter",
                 Some(path.clone()),
-                "frontmatter plan wajib berisi task_id dan state",
+                "plan frontmatter must contain task_id and state",
             ));
         }
         headings(&mut f, &path, &text, &h.plan);
@@ -137,14 +137,17 @@ pub fn check_docs(root: &Path, cfg: &Config) -> Result<Vec<Finding>> {
                             f.push(Finding::error(
                                 "contract.decision_link_broken",
                                 at.clone(),
-                                format!("entri {}: decision {v} tidak ada", e.task_id),
+                                format!("entry {}: decision {v} does not exist", e.task_id),
                             ));
                         }
                     }
                     _ => f.push(Finding::error(
                         "contract.change_field",
                         at.clone(),
-                        format!("entri {}: field \"{field}\" wajib diisi (pakai \"-\" untuk Decision kosong)", e.task_id),
+                        format!(
+                            "entry {}: field \"{field}\" is required (use \"-\" for no Decision)",
+                            e.task_id
+                        ),
                     )),
                 }
             }

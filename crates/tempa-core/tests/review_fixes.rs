@@ -355,7 +355,7 @@ fn symlink_outside_repo_is_not_copied() {
     assert!(
         r.gaps
             .iter()
-            .any(|g| g.contains("notes.md") && g.contains("luar repo")),
+            .any(|g| g.contains("notes.md") && g.contains("outside the repo")),
         "{:?}",
         r.gaps
     );
@@ -414,7 +414,7 @@ fn hooks_fail_clearly_without_tempa_on_path() {
         .output()
         .unwrap();
     assert_eq!(o.status.code(), Some(1));
-    assert!(String::from_utf8_lossy(&o.stderr).contains("tempa: perintah tidak ditemukan"));
+    assert!(String::from_utf8_lossy(&o.stderr).contains("tempa: command not found"));
 }
 
 #[test]

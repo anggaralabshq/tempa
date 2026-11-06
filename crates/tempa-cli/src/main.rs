@@ -66,6 +66,8 @@ enum Cmd {
     },
     /// Print the pull request body
     PrBody,
+    /// Run the MCP server on stdio (agents start this themselves)
+    Mcp,
     /// Absorb .claude/, CLAUDE.md, .cursorrules, etc. into the neutral source, then sync
     Import {
         /// Write changes (without this flag, report only)
@@ -188,6 +190,26 @@ fn git_add(root: &Path, paths: &[String]) -> tempa_core::Result<()> {
     Ok(())
 }
 
+/// stdio JSON-RPC loop. stdout carries replies only; diagnostics go to stderr.
+fn serve_mcp() -> tempa_core::Result<()> {
+    use std::io::{BufRead, Write};
+    let root = Command::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| std::path::PathBuf::from(String::from_utf8_lossy(&o.stdout).trim()))
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let mut out = std::io::stdout().lock();
+    for line in std::io::stdin().lock().lines() {
+        if let Some(reply) = tempa_core::mcp::handle_line(&root, &line?) {
+            writeln!(out, "{reply}")?;
+            out.flush()?;
+        }
+    }
+    Ok(())
+}
+
 fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
     match cmd {
         Cmd::Sync { check: true, .. } => {
@@ -274,6 +296,10 @@ fn run(cmd: Cmd, root: &Path) -> tempa_core::Result<bool> {
         }
         Cmd::Doctor => {
             print_doctor(&doctor::doctor(root)?);
+            Ok(false)
+        }
+        Cmd::Mcp => {
+            serve_mcp()?;
             Ok(false)
         }
         Cmd::PrBody => {

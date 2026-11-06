@@ -20,3 +20,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-mcp-protocol
+- Ringkasan: tempa mcp server: protocol core and read tools
+- Alasan: Agents need the contract over MCP (M3-lite, part 1 of 3)
+- Decision: docs/decisions/2026-11-06-mcp-server-on-serde-json.md
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

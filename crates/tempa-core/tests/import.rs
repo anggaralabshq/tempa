@@ -118,3 +118,23 @@ fn repo_without_any_agent_files() {
     assert_eq!(r.written, vec!["tempa.toml".to_string()]);
     assert!(r.gaps.is_empty());
 }
+
+#[test]
+fn includes_outside_repo_are_never_inlined() {
+    let outside = tempfile::tempdir().unwrap();
+    write(outside.path(), "secret.md", "RAHASIA-PRIBADI\n");
+    let d = tempfile::tempdir().unwrap();
+    let abs = outside.path().join("secret.md");
+    write(d.path(), "CLAUDE.md", &format!("# P\n\n@{}\n\n@../secret.md\n\n@~/.claude/notes.md\n", abs.display()));
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&abs, d.path().join("link.md")).unwrap();
+    #[cfg(unix)]
+    {
+        let c = d.path().join("CLAUDE.md");
+        std::fs::write(&c, std::fs::read_to_string(&c).unwrap() + "\n@link.md\n").unwrap();
+    }
+    let r = import(d.path(), true).unwrap();
+    let agents = read(d.path(), "AGENTS.md");
+    assert!(!agents.contains("RAHASIA-PRIBADI"), "{agents}");
+    assert!(r.gaps.iter().filter(|g| g.contains("di luar repo")).count() >= 3, "{:?}", r.gaps);
+}

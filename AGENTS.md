@@ -1,0 +1,30 @@
+# tempa
+
+CLI Rust yang menjaga satu kontrak konteks (AGENTS.md + `.tempa/` + `tempa.toml`) dan meng-generate file untuk Claude Code, Codex, Gemini CLI, OpenCode, dan Cursor.
+
+## Stack
+
+- Rust edition 2024, MSRV 1.85 (image CI `rust:1.85-alpine`); toolchain lokal stable.
+- Workspace: `crates/tempa-core` (library, semua logika) dan `crates/tempa-cli` (binary `tempa`, clap, tipis).
+- Git dipanggil lewat CLI `git` (`crates/tempa-core/src/gitx.rs`), bukan libgit2.
+
+## Perintah
+
+- Test: `cargo test --workspace`
+- Lint: `cargo clippy --workspace --all-targets -- -D warnings`
+- Format: `cargo fmt --all` (cek: `cargo fmt --check`)
+- E2E: `cargo build --release -p tempa-cli && scripts/e2e.sh target/release/tempa`
+
+## Konvensi
+
+- TDD: test yang gagal dulu, baru kode. Regresi dari review masuk `crates/tempa-core/tests/review_fixes.rs` atau file test modulnya.
+- Logika di `tempa-core` berupa fungsi murni sebisa mungkin; CLI hanya parsing argumen dan mencetak.
+- Pesan untuk pengguna dalam Bahasa Indonesia; identifier dan komentar kode dalam Bahasa Inggris.
+- Setiap temuan berbentuk `Finding { code, severity, path, message }`; kode stabil seperti `drift.modified`.
+- Jangan pernah menimpa file milik pengguna tanpa bukti tempa yang menulisnya (lock hash) atau `--force`.
+- Format target per agent hanya boleh berubah bersama `docs/target-matrix.md` dan sumber docs resminya.
+
+## Area terlarang
+
+- `crates/tempa-core/tests/fixtures/` hanya diubah bila test memang butuh data baru.
+- Jangan edit file hasil generate (`CLAUDE.md`, `.claude/`, `.gemini/`, `.cursor/`, `.opencode/`, `.agents/`, `opencode.json`, `.codex/`); ubah sumbernya lalu `tempa sync`.

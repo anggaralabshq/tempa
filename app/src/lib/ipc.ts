@@ -13,3 +13,8 @@ export async function ptySpawn(cwd: string | null, cols: number, rows: number, h
 export const ptyWrite = (id: number, data: string) => invoke("pty_write", { id, data });
 export const ptyResize = (id: number, cols: number, rows: number) => invoke("pty_resize", { id, cols, rows });
 export const ptyKill = (id: number) => invoke("pty_kill", { id });
+
+export type Project = { id: string; name: string; path: string };
+export const projectsList = () => invoke<Project[]>("projects_list");
+export const projectsAdd = (path: string) => invoke<Project>("projects_add", { path });
+export const projectsRemove = (id: string) => invoke("projects_remove", { id });

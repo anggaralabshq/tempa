@@ -2,7 +2,7 @@
 
 One context contract and one workflow for every coding agent.
 
-Teams rarely use a single coding agent. One engineer lives in Claude Code, another in Codex, Gemini CLI, OpenCode or Cursor, and each reads a different set of files. Project knowledge piles up in one agent's format (usually `CLAUDE.md` and `.claude/`), and everyone else starts from zero. Output quality drifts with it.
+Teams rarely use a single coding agent. One engineer lives in Claude Code, another in Codex, Gemini CLI, OpenCode, Cursor or GitHub Copilot, and each reads a different set of files. Project knowledge piles up in one agent's format (usually `CLAUDE.md` and `.claude/`), and everyone else starts from zero. Output quality drifts with it.
 
 tempa keeps the contract in one neutral place and makes every agent read it, then holds every change to the same workflow:
 
@@ -11,7 +11,7 @@ tempa keeps the contract in one neutral place and makes every agent read it, the
 - **One workflow.** Every change is a task with a plan, an optional decision record, a changes entry naming the agent and model used, and a pull request body with the same structure, whichever agent did the work.
 - **Gates before CI.** Git hooks sync and check locally; the same `tempa check` runs in CI when you add it.
 
-Supported agents: Claude Code, Codex, Gemini CLI, OpenCode, Cursor. What each one supports, and where tempa has to fall back, is in [docs/target-matrix.md](docs/target-matrix.md); `tempa doctor` reports it per repo.
+Supported agents: Claude Code, Codex, Gemini CLI, OpenCode, Cursor, GitHub Copilot. What each one supports, and where tempa has to fall back, is in [docs/target-matrix.md](docs/target-matrix.md); `tempa doctor` reports it per repo.
 
 ## Install
 

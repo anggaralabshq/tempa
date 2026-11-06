@@ -14,15 +14,17 @@ pub enum Agent {
     Gemini,
     Opencode,
     Cursor,
+    Copilot,
 }
 
 impl Agent {
-    pub const ALL: [Agent; 5] = [
+    pub const ALL: [Agent; 6] = [
         Agent::Claude,
         Agent::Codex,
         Agent::Gemini,
         Agent::Opencode,
         Agent::Cursor,
+        Agent::Copilot,
     ];
 
     pub fn name(&self) -> &'static str {
@@ -32,6 +34,7 @@ impl Agent {
             Agent::Gemini => "gemini",
             Agent::Opencode => "opencode",
             Agent::Cursor => "cursor",
+            Agent::Copilot => "copilot",
         }
     }
 }
@@ -248,7 +251,7 @@ changes   = "CHANGES.md"
 harness   = "HARNESS.md"
 
 [agents]
-enabled = ["claude", "codex", "gemini", "opencode", "cursor"]
+enabled = ["claude", "codex", "gemini", "opencode", "cursor", "copilot"]
 
 [harness]         # run in order; every command must exit 0
 # format    = "bun run format:check"

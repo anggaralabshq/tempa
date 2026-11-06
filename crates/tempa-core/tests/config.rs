@@ -17,7 +17,7 @@ fn default_toml_roundtrips() {
     assert_eq!(c.docs.plan, "docs/plans/");
     assert_eq!(c.gates.max_diff_lines, 800);
     assert_eq!(c.gates.protected_paths, vec![".env*", "tempa.toml"]);
-    assert_eq!(c.agents.enabled.len(), 5);
+    assert_eq!(c.agents.enabled.len(), 6);
     assert_eq!(c.headings.context[3], "Area terlarang");
     assert_eq!(c.ci.base, "main");
     assert_eq!(c.ci.skip_authors, vec!["renovate[bot]"]);

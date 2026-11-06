@@ -3,6 +3,7 @@
 pub mod agents;
 pub mod chat;
 pub mod conn;
+pub mod policy;
 pub mod session;
 
 #[cfg(test)]

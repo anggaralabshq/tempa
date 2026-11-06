@@ -284,3 +284,19 @@ fn diff_gate_ignores_lockfiles() {
     let f = check(d.path(), &contract()).unwrap();
     assert!(codes(&f).contains(&"task.diff_too_large"), "{f:?}");
 }
+
+#[test]
+fn is_protected_matches_config_globs() {
+    let mut cfg =
+        tempa_core::config::Config::parse(&tempa_core::config::default_toml("x")).unwrap();
+    cfg.gates.protected_paths = vec![
+        ".env*".into(),
+        ".github/workflows/**".into(),
+        "tempa.toml".into(),
+    ];
+    let p = |rel| tempa_core::check::is_protected(&cfg, rel);
+    assert!(p(".env") && p(".env.local") && p("tempa.toml") && p(".github/workflows/ci.yml"));
+    assert!(!p("src/env.rs") && !p("docs/tempa.toml.md"));
+    cfg.gates.protected_paths = vec!["[".into()]; // invalid glob fails closed
+    assert!(tempa_core::check::is_protected(&cfg, "src/a.rs"));
+}

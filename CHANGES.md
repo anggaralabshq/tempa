@@ -125,3 +125,10 @@
 - Decision: -
 - Harness: pass
 - Agent: claude-code / claude-opus-5-5
+
+## 2026-11-06 · 20261106-readme-banner
+- Summary: README: banner, badges, call-to-action row, architecture diagram and a 3-step quick start
+- Reason: Make the repository read like a product page for first-time visitors
+- Decision: -
+- Harness: pass
+- Agent: claude-code / claude-opus-5-5

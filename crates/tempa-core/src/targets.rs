@@ -216,6 +216,12 @@ fn item_raw(item: &Item) -> String {
     with_header(item.front.as_ref().map(|f| f.raw.as_str()), &item.body)
 }
 
+/// Flat file name for agents that keep one directory level: `backend/reviewer.md` →
+/// `backend-reviewer`, so agents in different subfolders do not overwrite each other.
+fn flat_stem(rel: &str) -> String {
+    rel.strip_suffix(".md").unwrap_or(rel).replace('/', "-")
+}
+
 fn stem(rel: &str) -> &str {
     let name = rel.rsplit('/').next().unwrap_or(rel);
     name.strip_suffix(".md").unwrap_or(name)
@@ -549,8 +555,7 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
                 let d = front_get(a, "description").unwrap_or(name);
                 t += &format!("description = {}\n", toml_basic(d));
                 t += &format!("developer_instructions = {}\n", toml_multiline(&a.body));
-                let file = stem(&a.rel).replace('/', "-");
-                o.file(format!(".codex/agents/{file}.toml"), t);
+                o.file(format!(".codex/agents/{}.toml", flat_stem(&a.rel)), t);
             }
             skills(o, src, ".agents/skills");
             deny_gaps(o, cfg);
@@ -688,11 +693,19 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
         Agent::Copilot => {
             // Context: Copilot reads AGENTS.md itself (docs.github.com/en/copilot/reference/
             // custom-instructions-support); a copilot-instructions.md would load it twice.
-            let taken: BTreeSet<&str> = src.skills.iter().map(|s| s.name.as_str()).collect();
+            let mut taken: BTreeSet<String> =
+                src.skills.iter().map(|s| s.name.to_lowercase()).collect();
             for c in &src.commands {
                 // Prompt files are not loaded by the Copilot harness or CLI; user-invoked skills are.
                 let name = skill_name(&c.rel);
-                if taken.contains(name.as_str()) {
+                if name.is_empty() {
+                    o.gap(
+                        "commands",
+                        &format!("{} (no ASCII letters for a Copilot skill name)", c.rel),
+                    );
+                    continue;
+                }
+                if !taken.insert(name.clone()) {
                     o.gap(
                         "commands",
                         &format!("{} (a skill named {name} exists)", c.rel),
@@ -719,7 +732,7 @@ pub fn render(agent: Agent, cfg: &Config, src: &Source) -> Rendered {
             }
             for a in &src.agents {
                 o.file(
-                    format!(".github/agents/{}.agent.md", stem(&a.rel)),
+                    format!(".github/agents/{}.agent.md", flat_stem(&a.rel)),
                     named_agent(a),
                 );
             }
